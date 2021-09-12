@@ -6,9 +6,10 @@
 // hardware speficics
 const int BUTTON_PORT = 7;
 const int LED_PORT = 4;
+const int MCP2515_PORT = 10;
 
 struct can_frame canMsg;
-MCP2515 mcp2515(10);
+MCP2515 mcp2515(MCP2515_PORT);
 
 enum class Error
 {
@@ -21,6 +22,8 @@ Error s_error = Error::OK;
 int loopErrorLed()
 {
     pinMode(LED_PORT, OUTPUT);
+
+    // test 2sec on
     digitalWrite(LED_PORT, HIGH);
     delay(2000);
     digitalWrite(LED_PORT, LOW);
@@ -29,7 +32,7 @@ int loopErrorLed()
     {
         if (s_error == Error::OK)
         {
-            delay(10);
+            delay(50);
             continue;
         }
         int delayMs = 1000 / static_cast<int>(s_error);
@@ -78,7 +81,7 @@ int loopButton()
     {
         int sensorVal = digitalRead(BUTTON_PORT);
         if (sensorVal == LOW) digitalWrite(LED_PORT, HIGH);
-        delay(10);
+        delay(40);
     }
 }
 
@@ -86,14 +89,18 @@ CoopTask<> taskErrorLed("errorLed", loopErrorLed);
 CoopTask<> taskCAN("can", loopCAN);
 CoopTask<> taskButton("button", loopButton);
 
-void setup()
+void initSerial()
 {
     while (!Serial)
         ;
     Serial.begin(115200);
-    SPI.begin();
+}
 
-    delay(2000);
+void setup()
+{
+    initSerial();
+
+    SPI.begin();
 
     taskErrorLed.scheduleTask();
     taskCAN.scheduleTask();
