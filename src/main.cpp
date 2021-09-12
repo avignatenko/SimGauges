@@ -1,12 +1,17 @@
 #include <Arduino.h>
 #include <CoopTask.h>
-#include <SPI.h>
+#include <SwitecX25.h>
 #include <mcp2515.h>
 
 // hardware speficics
 const int BUTTON_PORT = 7;
 const int LED_PORT = 4;
 const int MCP2515_PORT = 10;
+
+// standard X25.168 range 315 degrees at 1/3 degree steps
+#define STEPS (315 * 3)
+// For motors connected to digital pins 4,5,6,7
+SwitecX25 motor1(STEPS, A0, A1, A2, A3);
 
 struct can_frame canMsg;
 MCP2515 mcp2515(MCP2515_PORT);
@@ -19,14 +24,19 @@ enum class Error
 
 Error s_error = Error::OK;
 
+void digitalWritePeriod(int port, int value, int period)
+{
+    digitalWrite(port, value);
+    delay(period);
+    digitalWrite(port, 1 - value);
+}
+
 int loopErrorLed()
 {
     pinMode(LED_PORT, OUTPUT);
 
     // test 2sec on
-    digitalWrite(LED_PORT, HIGH);
-    delay(2000);
-    digitalWrite(LED_PORT, LOW);
+    digitalWritePeriod(LED_PORT, HIGH, 2000);
 
     for (;;)
     {
@@ -36,9 +46,7 @@ int loopErrorLed()
             continue;
         }
         int delayMs = 1000 / static_cast<int>(s_error);
-        digitalWrite(LED_PORT, LOW);
-        delay(delayMs);
-        digitalWrite(LED_PORT, HIGH);
+        digitalWritePeriod(LED_PORT, LOW, delayMs);
         delay(delayMs);
     }
 
@@ -71,6 +79,8 @@ int loopCAN()
         mcp2515.sendMessage(&canMsg);
         yield();
     }
+
+    return 0;
 }
 
 int loopButton()
@@ -80,14 +90,37 @@ int loopButton()
     for (;;)
     {
         int sensorVal = digitalRead(BUTTON_PORT);
-        if (sensorVal == LOW) digitalWrite(LED_PORT, HIGH);
+        if (sensorVal == LOW)
+        {
+            digitalWritePeriod(LED_PORT, HIGH, 100);
+            continue;
+        }
         delay(40);
     }
+
+    return 0;
+}
+
+int loopStepper()
+{
+    // run the motor against the stops
+    motor1.zero();
+    // start moving towards the center of the range
+    motor1.setPosition(0);
+
+    for (;;)
+    {
+        motor1.update();
+        yield();
+    }
+
+    return 0;
 }
 
 CoopTask<> taskErrorLed("errorLed", loopErrorLed);
 CoopTask<> taskCAN("can", loopCAN);
 CoopTask<> taskButton("button", loopButton);
+CoopTask<> taskStepper("stepper", loopStepper);
 
 void initSerial()
 {
@@ -105,6 +138,7 @@ void setup()
     taskErrorLed.scheduleTask();
     taskCAN.scheduleTask();
     taskButton.scheduleTask();
+    taskStepper.scheduleTask();
 }
 
 void loop()
