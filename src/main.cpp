@@ -124,9 +124,9 @@ CoopTask<> taskStepper("stepper", loopStepper);
 
 void initSerial()
 {
+    Serial.begin(115200);
     while (!Serial)
         ;
-    Serial.begin(115200);
 }
 
 void setup()
