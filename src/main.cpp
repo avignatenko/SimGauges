@@ -1,34 +1,42 @@
 #include <Arduino.h>
 #include <CoopTask.h>
 #include <SwitecX25.h>
-#include <mcp2515.h>
+#include <mcp_can.h>
 
 // hardware speficics
 const int BUTTON_PORT = 7;
 const int LED_PORT = 4;
-const int MCP2515_PORT = 10;
+const int MCP2515_SPI_PORT = 10;
+const int MCP2515_INT_PIN = 2;
 
 // standard X25.168 range 315 degrees at 1/3 degree steps
 #define STEPS (315 * 3)
 // For motors connected to digital pins 4,5,6,7
 SwitecX25 motor1(STEPS, A0, A1, A2, A3);
 
-struct can_frame canMsg;
-MCP2515 mcp2515(MCP2515_PORT);
+// struct can_frame canMsg;
+MCP_CAN mcpCAN(MCP2515_SPI_PORT);
 
-enum class Error
+enum Error
 {
-    OK = 0,
-    CAN = 1,
+    ERROR_OK = 0,
+    ERROR_CAN = (1 << 0),
 };
 
-Error s_error = Error::OK;
+int s_error = ERROR_OK;
 
 void digitalWritePeriod(int port, int value, int period)
 {
     digitalWrite(port, value);
     delay(period);
     digitalWrite(port, 1 - value);
+}
+
+int getHighestBit(int value)
+{
+    int r = 0;
+    while (value >>= 1) r++;
+    return r;
 }
 
 int loopErrorLed()
@@ -40,12 +48,14 @@ int loopErrorLed()
 
     for (;;)
     {
-        if (s_error == Error::OK)
+        if (s_error == ERROR_OK)
         {
-            delay(50);
+            delay(100);
             continue;
         }
-        int delayMs = 1000 / static_cast<int>(s_error);
+
+        int highestBit = getHighestBit(s_error);
+        int delayMs = 1000 / (highestBit + 1);
         digitalWritePeriod(LED_PORT, LOW, delayMs);
         delay(delayMs);
     }
@@ -53,34 +63,50 @@ int loopErrorLed()
     return 0;
 }
 
-void processCANError(MCP2515::ERROR e)
-{
-    Serial.print("CAN Error : ");
-    Serial.println(e);
-
-    if (s_error == Error::OK && e != MCP2515::ERROR_OK) s_error = Error::CAN;
-}
-
 int loopCAN()
 {
-    MCP2515::ERROR e = MCP2515::ERROR_OK;
-    e = mcp2515.reset();
-    processCANError(e);
-    e = mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
-    processCANError(e);
-    e = mcp2515.setNormalMode();
-    processCANError(e);
+    for (int i = 0; i < 5; ++i)
+    {
+        if (CAN_OK == mcpCAN.begin(CAN_500KBPS))  // init can bus : baudrate = 500k
+        {
+            Serial.println("CAN BUS Shield init ok!");
+            s_error &= ~ERROR_CAN;
+            break;
+        }
+        else
+        {
+            Serial.println("CAN BUS Shield init fail");
+            Serial.println("Init CAN BUS Shield again");
+            s_error |= ERROR_CAN;
+            delay(500);
+            continue;
+        }
+    }
 
     for (;;)
     {
-        canMsg.can_id = 0x12345678 | CAN_EFF_FLAG;
-        canMsg.can_dlc = 4;
-        canMsg.data[0] = 101;
-        mcp2515.sendMessage(&canMsg);
+        static unsigned char stmp[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+        // send data:  id = 0x00, standrad flame, data len = 8, stmp: data buf
+        mcpCAN.sendMsgBuf(0x12345678, 1, 8, stmp);
         yield();
     }
 
     return 0;
+}
+
+int loopCANCheck()
+{
+    for (;;)
+    {
+        delay(1000);
+        int error = mcpCAN.checkError();
+        if (error != 0 && !(s_error & ERROR_CAN))
+        {
+            Serial.print("CAN error: ");
+            Serial.println(error);
+            s_error |= ERROR_CAN;
+        }
+    }
 }
 
 int loopButton()
@@ -119,6 +145,7 @@ int loopStepper()
 
 CoopTask<> taskErrorLed("errorLed", loopErrorLed);
 CoopTask<> taskCAN("can", loopCAN);
+CoopTask<> taskCANCheck("canCheck", loopCANCheck);
 CoopTask<> taskButton("button", loopButton);
 CoopTask<> taskStepper("stepper", loopStepper);
 
@@ -137,6 +164,7 @@ void setup()
 
     taskErrorLed.scheduleTask();
     taskCAN.scheduleTask();
+    taskCANCheck.scheduleTask();
     taskButton.scheduleTask();
     taskStepper.scheduleTask();
 }
