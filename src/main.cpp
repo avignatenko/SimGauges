@@ -56,7 +56,7 @@ int loopErrorLed()
 
         int highestBit = getHighestBit(s_error);
         int delayMs = 1000 / (highestBit + 1);
-        digitalWritePeriod(LED_PORT, LOW, delayMs);
+        digitalWritePeriod(LED_PORT, HIGH, delayMs);
         delay(delayMs);
     }
 
@@ -85,9 +85,19 @@ int loopCAN()
 
     for (;;)
     {
-        static unsigned char stmp[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-        // send data:  id = 0x00, standrad flame, data len = 8, stmp: data buf
-        mcpCAN.sendMsgBuf(0x12345678, 1, 8, stmp);
+        if (CAN_MSGAVAIL == mcpCAN.checkReceive())
+        {
+            static unsigned char len = 0;
+            static unsigned char buf[8];
+            // check if data coming
+            mcpCAN.readMsgBuf(&len, buf);  // read data,  len: data length, buf: data buf
+            for (int i = 0; i < len; i++)  // print the data
+            {
+                Serial.print(buf[i]);
+                Serial.print("\t");
+            }
+            Serial.println();
+        }
         yield();
     }
 
@@ -112,6 +122,7 @@ int loopCANCheck()
 int loopButton()
 {
     pinMode(BUTTON_PORT, INPUT_PULLUP);
+    pinMode(LED_PORT, OUTPUT);
 
     for (;;)
     {
@@ -130,7 +141,7 @@ int loopButton()
 int loopStepper()
 {
     // run the motor against the stops
-    motor1.zero();
+    // motor1.zero(); // FIXME: need to impplement this async
     // start moving towards the center of the range
     motor1.setPosition(0);
 
@@ -163,10 +174,10 @@ void setup()
     SPI.begin();
 
     taskErrorLed.scheduleTask();
-    taskCAN.scheduleTask();
-    taskCANCheck.scheduleTask();
     taskButton.scheduleTask();
     taskStepper.scheduleTask();
+    taskCAN.scheduleTask();
+    taskCANCheck.scheduleTask();
 }
 
 void loop()
