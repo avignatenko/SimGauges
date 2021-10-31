@@ -143,7 +143,6 @@ int loopStepper()
 {
     // run the motor against the stops
     motor1.zero();  // FIXME: need to impplement this async
-
     motor1.setPosition(motor1.steps / 2);
 
     for (;;)
