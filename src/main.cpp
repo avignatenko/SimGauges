@@ -11,8 +11,9 @@ const int MCP2515_INT_PIN = 2;
 
 // standard X25.168 range 315 degrees at 1/3 degree steps
 #define STEPS (315 * 3)
-// For motors connected to digital pins 4,5,6,7
-SwitecX25 motor1(STEPS, A0, A1, A2, A3);
+// FIXME: solder in proper way, to have A0, A1, A2, A3!
+// https://guy.carpenter.id.au/gaugette/2012/04/04/making-wiring-harnesses/
+SwitecX25 motor1(STEPS, A2, A3, A1, A0);
 
 // struct can_frame canMsg;
 MCP_CAN mcpCAN(MCP2515_SPI_PORT);
@@ -141,9 +142,10 @@ int loopButton()
 int loopStepper()
 {
     // run the motor against the stops
-    // motor1.zero(); // FIXME: need to impplement this async
-    // start moving towards the center of the range
-    motor1.setPosition(0);
+    motor1.zero();  // FIXME: need to impplement this async
+
+    int lastTime = 0;
+    motor1.setPosition(motor1.steps / 2);
 
     for (;;)
     {
