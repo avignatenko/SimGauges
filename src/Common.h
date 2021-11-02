@@ -4,6 +4,7 @@
 
 #define _TASK_MICRO_RES
 #define _TASK_INLINE
+#define _TASK_TIMECRITICAL
 #include <TaskScheduler.h>
 
 //#define DISABLE_LOGGING

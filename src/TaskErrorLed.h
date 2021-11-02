@@ -12,8 +12,8 @@ public:
     enum Error
     {
         ERROR_OK = 0,
-        ERROR_CAN = (1 << 0),
-        ERROR_TEST_LED = (5 << 0)
+        ERROR_TEST_LED = (1 << 0),
+        ERROR_CAN = (2 << 0),
     };
 
     void start();
@@ -29,7 +29,7 @@ private:
     void updateDelay();
 
     static void loopBlinkLedCallbackStatic();
-  
+
     void led(bool on);
 
 private:

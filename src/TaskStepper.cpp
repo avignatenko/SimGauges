@@ -16,7 +16,7 @@ void TaskStepper::loopStepperCallback()
 TaskStepper* TaskStepper::instance_ = nullptr;
 
 TaskStepper::TaskStepper(Scheduler& sh, byte p1, byte p2, byte p3, byte p4)
-    : task_(1 * TASK_MILLISECOND, -1, &loopStepperCallbackStatic, &sh, false)
+    : task_(1 * TASK_MILLISECOND, TASK_FOREVER, &loopStepperCallbackStatic, &sh, false)
 {
     Log.traceln("TaskStepper::TaskStepper");
 

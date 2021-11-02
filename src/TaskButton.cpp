@@ -10,7 +10,6 @@ void TaskButton::loopButtonCallbackStatic()
     me.loopButtonCallback();
 }
 
-
 void TaskButton::loopButtonCallback()
 {
     button_->update();
@@ -30,10 +29,10 @@ void TaskButton::loopButtonCallback()
 TaskButton* TaskButton::instance_ = nullptr;
 
 TaskButton::TaskButton(Scheduler& sh, byte ledPort)
-    : button_(new Bounce2::Button()),
-      task_(0, -1, &loopButtonCallbackStatic, &sh, false)
+    : button_(new Bounce2::Button()), task_(TASK_IMMEDIATE, TASK_FOREVER, &loopButtonCallbackStatic, &sh, false)
 {
     Log.traceln("TaskButton::TaskButton()");
+
     button_->attach(ledPort, INPUT_PULLUP);
     button_->interval(20);
     button_->setPressedState(LOW);
