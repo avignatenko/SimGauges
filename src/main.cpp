@@ -3,6 +3,7 @@
 
 #include <mcp_can.h>
 
+#include "TaskButton.h"
 #include "TaskErrorLed.h"
 #include "TaskStepper.h"
 
@@ -13,7 +14,6 @@ const int BUTTON_PORT = 7;
 const int LED_PORT = 4;
 const int MCP2515_SPI_PORT = 10;
 const int MCP2515_INT_PIN = 2;
-
 
 // struct can_frame canMsg;
 MCP_CAN mcpCAN(MCP2515_SPI_PORT);
@@ -74,30 +74,10 @@ int loopCANCheck()
     }
 }
 
-int loopButton()
-{
-    pinMode(BUTTON_PORT, INPUT_PULLUP);
-    pinMode(LED_PORT, OUTPUT);
-
-    for (;;)
-    {
-        int sensorVal = digitalRead(BUTTON_PORT);
-        if (sensorVal == LOW)
-        {
-            //digitalWritePeriod(LED_PORT, HIGH, 100);
-            continue;
-        }
-        delay(40);
-    }
-
-    return 0;
-}
-
-//CoopTask<> taskErrorLed("errorLed", loopErrorLed);
-//CoopTask<> taskCAN("can", loopCAN);
-//CoopTask<> taskCANCheck("canCheck", loopCANCheck);
-//CoopTask<> taskButton("button", loopButton);
-//CoopTask<> taskStepper("stepper", loopStepper);
+// CoopTask<> taskErrorLed("errorLed", loopErrorLed);
+// CoopTask<> taskCAN("can", loopCAN);
+// CoopTask<> taskCANCheck("canCheck", loopCANCheck);
+// CoopTask<> taskStepper("stepper", loopStepper);
 
 void initSerial()
 {
@@ -109,24 +89,24 @@ void initSerial()
 void setup()
 {
     initSerial();
-    debugPrintln("Started. Serial OK");
+
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    Log.noticeln("Started. Serial OK");
+
     SPI.begin();
 
     TaskErrorLed::init(taskManager, LED_PORT);
     TaskStepper::init(taskManager, A2, A3, A1, A0);
+    TaskButton::init(taskManager, BUTTON_PORT);
 
     TaskErrorLed::instance().start();
     TaskStepper::instance().start();
-
-    //taskErrorLed.scheduleTask();
-    //taskButton.scheduleTask();
-    //taskStepper.scheduleTask();
-    //taskCAN.scheduleTask();
-    //taskCANCheck.scheduleTask();
+    TaskButton::instance().start();
+    // taskCAN.scheduleTask();
+    // taskCANCheck.scheduleTask();
 }
 
 void loop()
 {
     taskManager.execute();
-   
 }

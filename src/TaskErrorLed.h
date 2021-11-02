@@ -6,13 +6,14 @@ class TaskErrorLed
 {
 public:
     static void init(Scheduler& sh, byte ledPort);
-    static void shutdown();
+
     static TaskErrorLed& instance();
 
     enum Error
     {
         ERROR_OK = 0,
         ERROR_CAN = (1 << 0),
+        ERROR_TEST_LED = (5 << 0)
     };
 
     void start();
@@ -24,11 +25,11 @@ private:
     TaskErrorLed(Scheduler& sh, byte ledPort);
 
     void loopBlinkLedCallback();
-    bool setupBlinkLedCallback();
+
+    void updateDelay();
 
     static void loopBlinkLedCallbackStatic();
-    static bool setupBlinkLedCallbackStatic();
-
+  
     void led(bool on);
 
 private:
