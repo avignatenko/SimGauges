@@ -8,4 +8,6 @@
 #include <TaskScheduler.h>
 
 //#define DISABLE_LOGGING
+#define LOGLEVEL LOG_LEVEL_NOTICE
+//#define LOGLEVEL LOG_LEVEL_VERBOSE
 #include <ArduinoLog.h>

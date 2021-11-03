@@ -1,7 +1,5 @@
 #include "TaskButton.h"
 
-#include "TaskErrorLed.h"
-
 #include <Bounce2.h>
 
 void TaskButton::loopButtonCallbackStatic()
@@ -12,17 +10,20 @@ void TaskButton::loopButtonCallbackStatic()
 
 void TaskButton::loopButtonCallback()
 {
+    if (!callback_) return;
+
     button_->update();
 
     if (button_->pressed())
     {
         Log.verboseln("TaskButton::loopButtonCallback::sensorVal == LOW");
-        TaskErrorLed::instance().addError(TaskErrorLed::ERROR_TEST_LED);
+        callback_(true);
+       
     }
     else if (button_->released())
     {
         Log.verboseln("TaskButton::loopButtonCallback::sensorVal == HIGH");
-        TaskErrorLed::instance().removeError(TaskErrorLed::ERROR_TEST_LED);
+        callback_(false);
     }
 }
 

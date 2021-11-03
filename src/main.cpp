@@ -1,12 +1,12 @@
 
-#include "Common.h"
+#include <Common.h>
 
-#include "TaskButton.h"
+#include <TaskButton.h>
 #include "TaskCAN.h"
 #include "TaskErrorLed.h"
-#include "TaskStepper.h"
+#include "TaskStepperX27.h"
 
-#include <SPI.h>
+#include "mcp_can.h"
 
 Scheduler taskManager;
 
@@ -23,22 +23,34 @@ void initSerial()
         ;
 }
 
+void onButtonPressed(bool pressed)
+{
+    if (pressed)
+        TaskErrorLed::instance().addError(TaskErrorLed::ERROR_TEST_LED);
+    else
+        TaskErrorLed::instance().removeError(TaskErrorLed::ERROR_TEST_LED);
+}
+
+void onSetValue(byte len, byte* payload, void* data) {}
+
 void setup()
 {
     initSerial();
 
-    Log.begin(LOG_LEVEL_NOTICE, &Serial);
+    Log.begin(LOGLEVEL, &Serial);
     Log.infoln("Started. Serial OK");
 
-    SPI.begin();
-
     TaskErrorLed::init(taskManager, LED_PORT);
-    TaskStepper::init(taskManager, A2, A3, A1, A0);
+    TaskStepperX27::init(taskManager, A2, A3, A1, A0);
     TaskButton::init(taskManager, BUTTON_PORT);
-    TaskCAN::init(taskManager, MCP2515_SPI_PORT, MCP2515_INT_PIN);
+    TaskButton::instance().setPressedCallback(onButtonPressed);
+
+    const uint16_t kSimAddress = 1;
+    TaskCAN::init(taskManager, MCP2515_SPI_PORT, MCP2515_INT_PIN, kSimAddress);
+    TaskCAN::instance().setReceiveCallback(onSetValue, 1);
 
     TaskErrorLed::instance().start();
-    TaskStepper::instance().start();
+    TaskStepperX27::instance().start();
     TaskButton::instance().start();
     TaskCAN::instance().start();
 }

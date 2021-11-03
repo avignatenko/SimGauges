@@ -16,6 +16,9 @@ public:
 
     void start();
 
+    using PressedCallback = void (*)(bool);
+    void setPressedCallback(PressedCallback callback) { callback_ = callback; }
+
 private:
     TaskButton(Scheduler& sh, byte btnPort);
 
@@ -27,6 +30,6 @@ private:
     static TaskButton* instance_;
 
     Bounce2::Button* button_;
-
+    PressedCallback callback_ = nullptr;
     Task task_;
 };

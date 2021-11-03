@@ -1,21 +1,21 @@
-#include "TaskStepper.h"
+#include "TaskStepperX27.h"
 
 #include <SwitecX25.h>
 
-void TaskStepper::loopStepperCallbackStatic()
+void TaskStepperX27::loopStepperCallbackStatic()
 {
-    TaskStepper& me = TaskStepper::instance();
+    TaskStepperX27& me = TaskStepperX27::instance();
     me.loopStepperCallback();
 }
 
-void TaskStepper::loopStepperCallback()
+void TaskStepperX27::loopStepperCallback()
 {
     motor_->update();
 }
 
-TaskStepper* TaskStepper::instance_ = nullptr;
+TaskStepperX27* TaskStepperX27::instance_ = nullptr;
 
-TaskStepper::TaskStepper(Scheduler& sh, byte p1, byte p2, byte p3, byte p4)
+TaskStepperX27::TaskStepperX27(Scheduler& sh, byte p1, byte p2, byte p3, byte p4)
     : task_(1 * TASK_MILLISECOND, TASK_FOREVER, &loopStepperCallbackStatic, &sh, false)
 {
     Log.traceln("TaskStepper::TaskStepper");
@@ -26,12 +26,12 @@ TaskStepper::TaskStepper(Scheduler& sh, byte p1, byte p2, byte p3, byte p4)
     motor_ = new SwitecX25(315 * 3, p1, p2, p3, p4);
 }
 
-void TaskStepper::init(Scheduler& sh, byte p1, byte p2, byte p3, byte p4)
+void TaskStepperX27::init(Scheduler& sh, byte p1, byte p2, byte p3, byte p4)
 {
-    instance_ = new TaskStepper(sh, p1, p2, p3, p4);
+    instance_ = new TaskStepperX27(sh, p1, p2, p3, p4);
 }
 
-void TaskStepper::start()
+void TaskStepperX27::start()
 {
     // run the motor against the stops
     // motor_->zero();  // FIXME: need to impplement this async
@@ -47,7 +47,7 @@ void TaskStepper::start()
 
     task_.enable();
 }
-TaskStepper& TaskStepper::instance()
+TaskStepperX27& TaskStepperX27::instance()
 {
     return *instance_;
 }
