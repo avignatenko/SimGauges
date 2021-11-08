@@ -25,7 +25,7 @@ public:
     static TaskCAN& instance();
     void start();
 
-    void sendMessage(uint32_t idTo, byte priority, byte port, uint16_t dstAddress, byte len, byte* payload);
+    void sendMessage(byte priority, byte port, uint16_t dstSimAddress, byte len, byte* payload);
 
     using MessageCallback = void (*)(byte, byte*, void*);
     void setReceiveCallback(MessageCallback callback, byte port, void* data = nullptr);
