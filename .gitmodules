@@ -1,0 +1,3 @@
+[submodule "lib/CANSim"]
+	path = lib/CANSim
+	url = git@github.com:avignatenko/CANSim.git
