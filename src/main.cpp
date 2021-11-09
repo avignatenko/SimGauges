@@ -33,13 +33,15 @@ void onButtonPressed(bool pressed)
 
 void onSetValue(byte len, byte* payload, void* data)
 {
+    Log.traceln("onSetValue");
     if (len != 2)
     {
         Log.errorln("onSetValue: wrong len");
         return;
     }
 
-    uint16_t pos = *reinterpret_cast<uint16_t*>(data);
+    uint16_t pos = *reinterpret_cast<uint16_t*>(payload);
+    Log.verboseln("Value: %d", pos);
     TaskStepperX27::instance().setPosition(pos);
 }
 
