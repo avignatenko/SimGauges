@@ -31,7 +31,17 @@ void onButtonPressed(bool pressed)
         TaskErrorLed::instance().removeError(TaskErrorLed::ERROR_TEST_LED);
 }
 
-void onSetValue(byte len, byte* payload, void* data) {}
+void onSetValue(byte len, byte* payload, void* data)
+{
+    if (len != 2)
+    {
+        Log.errorln("onSetValue: wrong len");
+        return;
+    }
+
+    uint16_t pos = *reinterpret_cast<uint16_t*>(data);
+    TaskStepperX27::instance().setPosition(pos);
+}
 
 void setup()
 {
@@ -45,9 +55,11 @@ void setup()
     TaskButton::init(taskManager, BUTTON_PORT);
     TaskButton::instance().setPressedCallback(onButtonPressed);
 
-    const uint16_t kSimAddress = 1;
+    const uint16_t kSimAddress = 16;
     TaskCAN::init(taskManager, MCP2515_SPI_PORT, MCP2515_INT_PIN, kSimAddress);
-    TaskCAN::instance().setReceiveCallback(onSetValue, 1);
+
+    // port 0: set arrow position
+    TaskCAN::instance().setReceiveCallback(onSetValue, 0);
 
     TaskErrorLed::instance().start();
     TaskStepperX27::instance().start();
