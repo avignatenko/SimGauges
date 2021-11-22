@@ -1,12 +1,15 @@
 
 #include <Common.h>
 
+#include "TaskMenu.h"
+
 #include <TaskButton.h>
 #include <TaskCAN.h>
 #include <TaskErrorLed.h>
 #include <TaskStepperX27.h>
 
 #include <InterpolationLib.h>
+
 Scheduler taskManager;
 
 // hardware speficics
@@ -33,7 +36,7 @@ void onButtonPressed(bool pressed)
 double xValues[5] = {0, 40, 60};
 double yValues[5] = {0, 40, 60};
 
-void onSetValue(byte len, byte* payload, void* data)
+void onSetValue(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len, byte* payload, void* data)
 {
     Log.traceln("onSetValue");
     if (len != 4)
@@ -47,10 +50,6 @@ void onSetValue(byte len, byte* payload, void* data)
     TaskStepperX27::instance().setPosition(static_cast<uint16_t>(Interpolation::SmoothStep(xValues, yValues, 5, pos)));
 }
 
-// void doMenu() {}
-
-// Task taskMenu(TASK_IMMEDIATE, TASK_FOREVER, &doMenu, &taskManager, false);
-
 void setup()
 {
     initSerial();
@@ -62,6 +61,7 @@ void setup()
     TaskStepperX27::init(taskManager, A2, A3, A1, A0);
     TaskButton::init(taskManager, BUTTON_PORT);
     TaskButton::instance().setPressedCallback(onButtonPressed);
+    TaskMenu::init(taskManager);
 
     const uint16_t kSimAddress = 16;
     TaskCAN::init(taskManager, MCP2515_SPI_PORT, MCP2515_INT_PIN, kSimAddress);
@@ -73,6 +73,7 @@ void setup()
     TaskStepperX27::instance().start();
     TaskButton::instance().start();
     TaskCAN::instance().start();
+    TaskMenu::instance().start();
 }
 
 void loop()
