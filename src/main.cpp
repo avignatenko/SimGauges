@@ -2,12 +2,11 @@
 #include <Common.h>
 
 #include <TaskButton.h>
-#include "TaskCAN.h"
-#include "TaskErrorLed.h"
-#include "TaskStepperX27.h"
+#include <TaskCAN.h>
+#include <TaskErrorLed.h>
+#include <TaskStepperX27.h>
 
-#include "mcp_can.h"
-
+#include <InterpolationLib.h>
 Scheduler taskManager;
 
 // hardware speficics
@@ -31,19 +30,26 @@ void onButtonPressed(bool pressed)
         TaskErrorLed::instance().removeError(TaskErrorLed::ERROR_TEST_LED);
 }
 
+double xValues[5] = {0, 40, 60};
+double yValues[5] = {0, 40, 60};
+
 void onSetValue(byte len, byte* payload, void* data)
 {
     Log.traceln("onSetValue");
-    if (len != 2)
+    if (len != 4)
     {
         Log.errorln("onSetValue: wrong len");
         return;
     }
 
-    uint16_t pos = *reinterpret_cast<uint16_t*>(payload);
-    Log.verboseln("Value: %d", pos);
-    TaskStepperX27::instance().setPosition(pos);
+    float pos = *reinterpret_cast<float*>(payload);
+    Log.verboseln("Value: %f", pos);
+    TaskStepperX27::instance().setPosition(static_cast<uint16_t>(Interpolation::SmoothStep(xValues, yValues, 5, pos)));
 }
+
+// void doMenu() {}
+
+// Task taskMenu(TASK_IMMEDIATE, TASK_FOREVER, &doMenu, &taskManager, false);
 
 void setup()
 {
