@@ -1,7 +1,6 @@
 #include "TaskMenu.h"
 
 #include <SimpleCLI.h>
-#include <TaskStepperX27.h>
 
 void TaskMenu::loopMenuCallbackStatic()
 {
@@ -11,26 +10,60 @@ void TaskMenu::loopMenuCallbackStatic()
 
 void TaskMenu::loopMenuCallback()
 {
-    Log.traceln("TaskMenu::loopBlinkLedCallback()");
+    Log.traceln("TaskMenu::loopMenuCallback()");
 
     // Check if user typed something into the serial monitor
     if (Serial.available())
     {
-        static String buffer;
-
-        char received = Serial.read();
-        if (received == '\n')
+        if (mode_ == INTERACTIVE)
         {
-            // Parse the user input into the CLI
-            cli->parse(buffer);
-            buffer = "";
-            Serial.println();
-            Serial.print("# ");
-            return;
+            char received = Serial.read();
+            if (received == 'e')
+            {
+                mode_ = CLI;
+                Serial.println("Exited from interactive mode");
+                Serial.print("# ");
+                return;
+            }
+            int16_t delta = 0;
+
+            switch (received)
+            {
+            case 'q':
+                delta = 1;
+                break;
+            case 'Q':
+                delta = 10;
+                break;
+            case 'w':
+                delta = -1;
+                break;
+            case 'W':
+                delta = -10;
+                break;
+            }
+
+            if (TaskMenu::instance().interactiveCallback_) TaskMenu::instance().interactiveCallback_(delta);
         }
 
-        buffer += received;
-        Serial.print(received);
+        if (mode_ == CLI)
+        {
+            static String buffer;
+
+            char received = Serial.read();
+            if (received == '\n')
+            {
+                // Parse the user input into the CLI
+                cli->parse(buffer);
+                buffer = "";
+                Serial.println();
+                Serial.print("# ");
+                return;
+            }
+
+            buffer += received;
+            Serial.print(received);
+        }
     }
 }
 
@@ -48,7 +81,26 @@ void TaskMenu::cmdPosCallback(cmd* c)
     // Get values
     int numberValue = numberArg.getValue().toInt();
 
-    TaskStepperX27::instance().setPosition(numberValue);
+    if (TaskMenu::instance().posCallback_) TaskMenu::instance().posCallback_(numberValue);
+}
+
+void TaskMenu::cmdLPosCallback(cmd* c)
+{
+    Command cmd(c);  // Create wrapper object
+
+    // Get arguments
+    Argument numberArg = cmd.getArgument("value");
+
+    // Get values
+    float numberValue = numberArg.getValue().toFloat();
+
+    if (TaskMenu::instance().lposCallback_) TaskMenu::instance().lposCallback_(numberValue);
+}
+
+void TaskMenu::cmdInteractiveCallback(cmd* c)
+{
+    Serial.println("Switch to interactive mode: 'q' - CCW, 'w' - CW, 'e' - Exit");
+    TaskMenu::instance().mode_ = INTERACTIVE;
 }
 
 void TaskMenu::cmdHelpCallback(cmd* c)
@@ -83,10 +135,18 @@ TaskMenu::TaskMenu(Scheduler& sh) : task_(TASK_IMMEDIATE, TASK_FOREVER, &loopMen
     cli->setErrorCallback(errorCallback);
 
     Command cmdPos = cli->addCommand("pos", cmdPosCallback);
-    cmdPos.addPositionalArgument("value", 0);
+    cmdPos.addPositionalArgument("value", "0");
+    cmdPos.setDescription(" Move to given steps value");
 
     Command cmdHelp = cli->addCommand("help", cmdHelpCallback);
     cmdHelp.setDescription(" Get help!");
+
+    Command cmdInteractive = cli->addCommand("int", cmdInteractiveCallback);
+    cmdInteractive.setDescription(" Interactive mode");
+
+    Command cmdLPos = cli->addCommand("lpos", cmdLPosCallback);
+    cmdLPos.addPositionalArgument("value", "0.0");
+    cmdLPos.setDescription(" Move to logical position");
 
     Serial.println("Welcome to gauge terminal!");
     Serial.print("# ");
@@ -102,6 +162,21 @@ void TaskMenu::start()
     Log.traceln("TaskMenu::start()");
 
     task_.enable();
+}
+
+void TaskMenu::setPosCallback(PosCallback callback)
+{
+    posCallback_ = callback;
+}
+
+void TaskMenu::setLPosCallback(LPosCallback callback)
+{
+    lposCallback_ = callback;
+}
+
+void TaskMenu::setInteractiveCallback(InteractiveCallback callback)
+{
+    interactiveCallback_ = callback;
 }
 
 TaskMenu& TaskMenu::instance()
