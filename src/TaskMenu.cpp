@@ -103,6 +103,25 @@ void TaskMenu::cmdInteractiveCallback(cmd* c)
     TaskMenu::instance().mode_ = INTERACTIVE;
 }
 
+void TaskMenu::cmdSimAddressCallback(cmd* c)
+{
+    Command cmd(c);  // Create wrapper object
+
+    // Get arguments
+    Argument numberArg = cmd.getArgument("value");
+
+    // Get values
+    float numberValue = numberArg.getValue().toFloat();
+
+    uint16_t newAddr = 0;
+    if (TaskMenu::instance().simAddressCallback_) newAddr = TaskMenu::instance().simAddressCallback_(numberValue);
+    if (newAddr)
+    {
+        Serial.println();
+        Serial.println(newAddr);
+    }
+}
+
 void TaskMenu::cmdHelpCallback(cmd* c)
 {
     Command cmd(c);  // Create wrapper object
@@ -148,6 +167,10 @@ TaskMenu::TaskMenu(Scheduler& sh) : task_(TASK_IMMEDIATE, TASK_FOREVER, &loopMen
     cmdLPos.addPositionalArgument("value", "0.0");
     cmdLPos.setDescription(" Move to logical position");
 
+    Command cmdSimAddr = cli->addCommand("addr", cmdSimAddressCallback);
+    cmdSimAddr.addPositionalArgument("value", "0");
+    cmdSimAddr.setDescription(" Get/Set this gauge CAN ID");
+
     Serial.println("Welcome to gauge terminal!");
     Serial.print("# ");
 }
@@ -177,6 +200,11 @@ void TaskMenu::setLPosCallback(LPosCallback callback)
 void TaskMenu::setInteractiveCallback(InteractiveCallback callback)
 {
     interactiveCallback_ = callback;
+}
+
+void TaskMenu::setSimAddressCallback(SimAddressCallback callback)
+{
+    simAddressCallback_ = callback;
 }
 
 TaskMenu& TaskMenu::instance()

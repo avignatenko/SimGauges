@@ -10,6 +10,8 @@
 
 #include <InterpolationLib.h>
 
+#include <EEPROM.h>
+
 Scheduler taskManager;
 
 // hardware speficics
@@ -21,6 +23,8 @@ const int MCP2515_INT_PIN = 2;
 const int STEPPER_STEP = A0;
 const int STEPPER_DIR = A1;
 const int STEPPER_RESET = A2;
+
+const int kEEPROMAddrIndex = 0;
 
 void initSerial()
 {
@@ -116,6 +120,16 @@ void onInteractiveCommand(uint16_t delta)
     Serial.println(newPos);
 }
 
+uint16_t onSimAddrCommand(uint16_t addr)
+{
+    if (addr == 0) return TaskCAN::instance().simAddress();
+
+    // write to eeprom
+    EEPROM.put(kEEPROMAddrIndex, addr);
+    TaskCAN::instance().setSimAddress(addr);
+    return addr;
+}
+
 void setup()
 {
     initSerial();
@@ -131,8 +145,17 @@ void setup()
     TaskMenu::instance().setPosCallback(onPosCommand);
     TaskMenu::instance().setInteractiveCallback(onInteractiveCommand);
     TaskMenu::instance().setLPosCallback(onLPosCommand);
+    TaskMenu::instance().setSimAddressCallback(onSimAddrCommand);
 
-    const uint16_t kSimAddress = 16;
+    uint16_t kSimAddress = 0;
+
+    EEPROM.get(kEEPROMAddrIndex, kSimAddress);
+    if (kSimAddress == 65535)
+    {
+        kSimAddress = 1023;
+        EEPROM.put(kEEPROMAddrIndex, kSimAddress);
+    }
+
     TaskCAN::init(taskManager, MCP2515_SPI_PORT, MCP2515_INT_PIN, kSimAddress);
 
     // port 0: set arrow position
@@ -153,11 +176,10 @@ void setup()
     s_lut.y()[3] = 1417;
 
     s_lut.x()[4] = 100;
-    s_lut.y()[4] = 1846;
+    s_lut.y()[4] = 1869;
 
     s_lut.x()[5] = 200;
     s_lut.y()[5] = 3657;
-
 
     TaskErrorLed::instance().start();
     TaskStepperX27Driver::instance().start();

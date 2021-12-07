@@ -19,9 +19,10 @@ public:
     void setPosCallback(PosCallback callback);
     using LPosCallback = void (*)(float);
     void setLPosCallback(LPosCallback callback);
-
     using InteractiveCallback = void (*)(uint16_t);
     void setInteractiveCallback(InteractiveCallback callback);
+    using SimAddressCallback = uint16_t (*)(uint16_t);
+    void setSimAddressCallback(SimAddressCallback callback);
 
 private:
     TaskMenu(Scheduler& sh);
@@ -37,6 +38,7 @@ private:
     static void cmdLPosCallback(cmd* c);
     static void cmdHelpCallback(cmd* c);
     static void cmdInteractiveCallback(cmd* c);
+    static void cmdSimAddressCallback(cmd* c);
     static void errorCallback(cmd_error* e);
 
 private:
@@ -55,4 +57,5 @@ private:
     PosCallback posCallback_ = nullptr;
     LPosCallback lposCallback_ = nullptr;
     InteractiveCallback interactiveCallback_ = nullptr;
+    SimAddressCallback simAddressCallback_ = nullptr;
 };
