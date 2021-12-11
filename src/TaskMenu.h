@@ -2,9 +2,7 @@
 
 #include "Common.h"
 
-class SimpleCLI;
-struct cmd;
-struct cmd_error;
+#include <cli.hpp>
 
 class TaskMenu
 {
@@ -34,24 +32,24 @@ private:
 
     void led(bool on);
 
-    static void cmdPosCallback(cmd* c);
-    static void cmdLPosCallback(cmd* c);
-    static void cmdHelpCallback(cmd* c);
-    static void cmdInteractiveCallback(cmd* c);
-    static void cmdSimAddressCallback(cmd* c);
-    static void errorCallback(cmd_error* e);
+    static int cmdPosCallback(ArgumentsInterface* c);
+    static void cmdLPosCallback(ArgumentsInterface* c);
+    static void cmdHelpCallback(ArgumentsInterface* c);
+    static void cmdInteractiveCallback(ArgumentsInterface* c);
+    static void cmdSimAddressCallback(ArgumentsInterface* c);
+    static void errorCallback(ArgumentsInterface* e);
 
 private:
     static TaskMenu* instance_;
     Task task_;
-
-    SimpleCLI* cli;
 
     enum Mode
     {
         CLI,
         INTERACTIVE
     };
+
+    CommandLineInterface* cmdLine_ = nullptr;
 
     Mode mode_ = CLI;
     PosCallback posCallback_ = nullptr;
