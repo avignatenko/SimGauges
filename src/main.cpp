@@ -25,6 +25,7 @@ const int STEPPER_DIR = A1;
 const int STEPPER_RESET = A2;
 
 const int kEEPROMAddrIndex = 0;
+const int kEEPROMLUTIndex = 5;
 
 void initSerial()
 {
@@ -41,7 +42,7 @@ void onButtonPressed(bool pressed)
         TaskErrorLed::instance().removeError(TaskErrorLed::ERROR_TEST_LED);
 }
 
-class StoredLUT
+class StoredLUT : public Printable
 {
 public:
     StoredLUT() {}
@@ -52,8 +53,6 @@ public:
     {
         clear();
         create(size);
-
-        size_ = size;
     }
 
     byte size() const { return size_; }
@@ -61,11 +60,64 @@ public:
     double* x() { return xValues_; }
     double* y() { return yValues_; }
 
+    size_t printTo(Print& p) const override
+    {
+        size_t r = 0;
+
+        for (int i = 0; i < size_; ++i)
+        {
+            if (i > 0) r += p.println();
+            r += p.print(xValues_[i]);
+            r += p.print(' ');
+            r += p.print(yValues_[i]);
+        }
+        return r;
+    }
+
+    bool load()
+    {
+        int idx = kEEPROMLUTIndex;
+
+        byte size = 255;
+        EEPROM.get(idx, size);
+        if (size == 255) return false;
+
+        resize(size);
+
+        idx += sizeof(size_);
+        for (int i = 0; i < size_; ++i)
+        {
+            EEPROM.get(idx, xValues_[i]);
+            idx += sizeof(xValues_[i]);
+
+            EEPROM.get(idx, yValues_[i]);
+            idx += sizeof(yValues_[i]);
+        }
+
+        return true;
+    }
+
+    void save()
+    {
+        int idx = kEEPROMLUTIndex;
+        EEPROM.put(idx, size_);
+        idx += sizeof(size_);
+        for (int i = 0; i < size_; ++i)
+        {
+            EEPROM.put(idx, xValues_[i]);
+            idx += sizeof(xValues_[i]);
+
+            EEPROM.put(idx, yValues_[i]);
+            idx += sizeof(yValues_[i]);
+        }
+    }
+
 private:
     void create(byte size)
     {
         xValues_ = new double[size];
         yValues_ = new double[size];
+        size_ = size;
     }
     void clear()
     {
@@ -115,7 +167,7 @@ void onLPosCommand(float pos)
 void onInteractiveCommand(uint16_t delta)
 {
     TaskStepperX27Driver& stp = TaskStepperX27Driver::instance();
-    uint16_t newPos = constrain(stp.position() + delta, 0, stp.totalSteps() - 1);
+    uint16_t newPos = stp.position() + delta;
     stp.setPosition(newPos);
     Serial.println(newPos);
 }
@@ -128,6 +180,32 @@ uint16_t onSimAddrCommand(uint16_t addr)
     EEPROM.put(kEEPROMAddrIndex, addr);
     TaskCAN::instance().setSimAddress(addr);
     return addr;
+}
+
+void onLUTCommand(TaskMenu::LUTCommand cmd, float posl, int16_t pos)
+{
+    if (cmd == TaskMenu::LUTCommand::Show)
+    {
+        Serial.println(s_lut);
+    }
+
+    if (cmd == TaskMenu::LUTCommand::Load)
+    {
+        s_lut.load();
+        Serial.println("OK");
+    }
+
+    if (cmd == TaskMenu::LUTCommand::Save)
+    {
+        s_lut.save();
+        Serial.println("OK");
+    }
+
+    if (cmd == TaskMenu::LUTCommand::Clear)
+    {
+        s_lut.resize(0);
+        Serial.println("OK");
+    }
 }
 
 void setup()
@@ -146,6 +224,7 @@ void setup()
     TaskMenu::instance().setInteractiveCallback(onInteractiveCommand);
     TaskMenu::instance().setLPosCallback(onLPosCommand);
     TaskMenu::instance().setSimAddressCallback(onSimAddrCommand);
+    TaskMenu::instance().setLUTCallback(onLUTCommand);
 
     uint16_t kSimAddress = 0;
 
@@ -162,24 +241,30 @@ void setup()
     TaskCAN::instance().setReceiveCallback(onSetValue, 0);
 
     // set some fake LUT
-    s_lut.resize(6);
-    s_lut.x()[0] = 0.0;
-    s_lut.y()[0] = 0.0;
 
-    s_lut.x()[1] = 40;
-    s_lut.y()[1] = 380;
+    bool hasLut = s_lut.load();
 
-    s_lut.x()[2] = 60;
-    s_lut.y()[2] = 928;
+    if (!hasLut)
+    {
+        s_lut.resize(6);
+        s_lut.x()[0] = 0.0;
+        s_lut.y()[0] = 0.0;
 
-    s_lut.x()[3] = 80;
-    s_lut.y()[3] = 1417;
+        s_lut.x()[1] = 40;
+        s_lut.y()[1] = 380;
 
-    s_lut.x()[4] = 100;
-    s_lut.y()[4] = 1869;
+        s_lut.x()[2] = 60;
+        s_lut.y()[2] = 928;
 
-    s_lut.x()[5] = 200;
-    s_lut.y()[5] = 3657;
+        s_lut.x()[3] = 80;
+        s_lut.y()[3] = 1417;
+
+        s_lut.x()[4] = 100;
+        s_lut.y()[4] = 1869;
+
+        s_lut.x()[5] = 200;
+        s_lut.y()[5] = 3657;
+    }
 
     TaskErrorLed::instance().start();
     TaskStepperX27Driver::instance().start();

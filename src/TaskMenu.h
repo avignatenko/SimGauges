@@ -22,6 +22,19 @@ public:
     using SimAddressCallback = uint16_t (*)(uint16_t);
     void setSimAddressCallback(SimAddressCallback callback);
 
+    enum class LUTCommand
+    {
+        Invalid,
+        Show,
+        Load,
+        Save,
+        Clear,
+        Set
+    };
+
+    using LUTCallback = void (*)(LUTCommand, float, int16_t);
+    void setLUTCallback(SimAddressCallback callback);
+
 private:
     TaskMenu(Scheduler& sh);
 
@@ -44,6 +57,8 @@ private:
     static void cmdHelpCallback(SerialCommands* sender);
     static void cmdSimAddressCallback(SerialCommands* sender);
 
+    static void cmdLUTCallback(SerialCommands* sender);
+
 private:
     static TaskMenu* instance_;
     Task task_;
@@ -61,4 +76,5 @@ private:
     LPosCallback lposCallback_ = nullptr;
     InteractiveCallback interactiveCallback_ = nullptr;
     SimAddressCallback simAddressCallback_ = nullptr;
+    LUTCallback lutCallback_ = nullptr;
 };

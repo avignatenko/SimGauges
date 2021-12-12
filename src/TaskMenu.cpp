@@ -20,8 +20,6 @@ void TaskMenu::loopMenuCallback()
 
 TaskMenu* TaskMenu::instance_ = nullptr;
 
-// Command cmdPos;
-
 void TaskMenu::cmdPosCallback(SerialCommands* sender)
 {
     const char* posStr = sender->Next();
@@ -80,13 +78,56 @@ void TaskMenu::cmdSimAddressCallback(SerialCommands* sender)
     }
 }
 
-void TaskMenu::cmdHelpCallback(SerialCommands* c)
+void TaskMenu::cmdLUTCallback(SerialCommands* sender)
 {
-#if 0
-    Command cmd(c);  // Create wrapper object
-    Serial.println("Help:");
-    Serial.println(TaskMenu::instance().cli->toString());
-#endif
+    if (!TaskMenu::instance().lutCallback_) return;
+
+    LUTCommand cmd = LUTCommand::Invalid;
+    float posl = -1.0;
+    uint16_t pos = -1;
+
+    const char* commandStr = sender->Next();
+    if (!commandStr || strcmp(commandStr, "show") == 0) cmd = LUTCommand::Show;
+    if (strcmp(commandStr, "save") == 0) cmd = LUTCommand::Save;
+    if (strcmp(commandStr, "load") == 0) cmd = LUTCommand::Load;
+    if (strcmp(commandStr, "clear") == 0) cmd = LUTCommand::Clear;
+    if (strcmp(commandStr, "set") == 0)
+    {
+        cmd = LUTCommand::Set;
+        const char* poslStr = sender->Next();
+        if (!poslStr)
+        {
+            sender->GetSerial()->println("Error: set needs logical position");
+        }
+
+        posl = atof(poslStr);
+
+        const char* posStr = sender->Next();
+        if (posStr) pos = atoi(posStr);
+    }
+    if (cmd == LUTCommand::Invalid)
+    {
+        sender->GetSerial()->println("Error: unknown command");
+        return;
+    }
+
+    TaskMenu::instance().lutCallback_(cmd, posl, pos);
+}
+
+void TaskMenu::cmdHelpCallback(SerialCommands* sender)
+{
+    static const char s_helpText[] = R"=====( 
+Help: 
+ help - this help text
+ pos <position> - move motor to given position
+ q,Q,w,W - (single key commands) move motor needle (q,w - slow, Q,W - fast)
+ lpos <position> - move motor to logical position
+ addr <address> - change sim address for this device
+ lut [show|load|save|clear|set] [valuel] [valuep] - modify LUT table for the motor 
+)=====";
+
+    Stream* s = sender->GetSerial();
+    s->println(s_helpText);
 }
 
 // Callback in case of an error
@@ -104,6 +145,7 @@ TaskMenu::TaskMenu(Scheduler& sh) : task_(TASK_IMMEDIATE, TASK_FOREVER, &loopMen
     static char s_serial_command_buffer[32];
     cmdLine_ = new SerialCommands(&Serial, s_serial_command_buffer, sizeof(s_serial_command_buffer), "\r\n", " ");
 
+    static SerialCommand s_cmdHelp("help", &TaskMenu::cmdHelpCallback);
     static SerialCommand s_cmdPos("pos", &TaskMenu::cmdPosCallback);
     static SerialCommand s_cmdPosCCW("q", &TaskMenu::cmdCCWCallback, true);
     static SerialCommand s_cmdPosCCWFast("Q", &TaskMenu::cmdCCWFastCallback, true);
@@ -111,7 +153,9 @@ TaskMenu::TaskMenu(Scheduler& sh) : task_(TASK_IMMEDIATE, TASK_FOREVER, &loopMen
     static SerialCommand s_cmdPosCWFast("W", &TaskMenu::cmdCWFastCallback, true);
     static SerialCommand s_cmdLPos("lpos", &TaskMenu::cmdLPosCallback);
     static SerialCommand s_cmdAddr("addr", &TaskMenu::cmdSimAddressCallback);
+    static SerialCommand s_cmdLUT("lut", &TaskMenu::cmdLUTCallback);
 
+    cmdLine_->AddCommand(&s_cmdHelp);
     cmdLine_->AddCommand(&s_cmdPos);
     cmdLine_->AddCommand(&s_cmdPosCCW);
     cmdLine_->AddCommand(&s_cmdPosCCWFast);
@@ -119,11 +163,11 @@ TaskMenu::TaskMenu(Scheduler& sh) : task_(TASK_IMMEDIATE, TASK_FOREVER, &loopMen
     cmdLine_->AddCommand(&s_cmdPosCWFast);
     cmdLine_->AddCommand(&s_cmdLPos);
     cmdLine_->AddCommand(&s_cmdAddr);
+    cmdLine_->AddCommand(&s_cmdLUT);
 
     cmdLine_->SetDefaultHandler(&TaskMenu::errorCallback);
 
-    Serial.println("Welcome to gauge terminal!");
-
+    Serial.println("Welcome to gauge terminal! Type 'help' for list of commands.");
 }
 
 void TaskMenu::init(Scheduler& sh)
@@ -156,6 +200,11 @@ void TaskMenu::setInteractiveCallback(InteractiveCallback callback)
 void TaskMenu::setSimAddressCallback(SimAddressCallback callback)
 {
     simAddressCallback_ = callback;
+}
+
+void TaskMenu::setLUTCallback(SimAddressCallback callback)
+{
+    lutCallback_ = callback;
 }
 
 TaskMenu& TaskMenu::instance()
