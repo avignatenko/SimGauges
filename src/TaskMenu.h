@@ -2,7 +2,7 @@
 
 #include "Common.h"
 
-#include <cli.hpp>
+class SerialCommands;
 
 class TaskMenu
 {
@@ -32,12 +32,17 @@ private:
 
     void led(bool on);
 
-    static int cmdPosCallback(ArgumentsInterface* c);
-    static void cmdLPosCallback(ArgumentsInterface* c);
-    static void cmdHelpCallback(ArgumentsInterface* c);
-    static void cmdInteractiveCallback(ArgumentsInterface* c);
-    static void cmdSimAddressCallback(ArgumentsInterface* c);
-    static void errorCallback(ArgumentsInterface* e);
+    static void cmdPosCallback(SerialCommands* sender);
+    static void errorCallback(SerialCommands* sender, const char* command);
+
+    static void cmdCCWCallback(SerialCommands* sender);
+    static void cmdCCWFastCallback(SerialCommands* sender);
+    static void cmdCWCallback(SerialCommands* sender);
+    static void cmdCWFastCallback(SerialCommands* sender);
+
+    static void cmdLPosCallback(SerialCommands* sender);
+    static void cmdHelpCallback(SerialCommands* sender);
+    static void cmdSimAddressCallback(SerialCommands* sender);
 
 private:
     static TaskMenu* instance_;
@@ -49,7 +54,7 @@ private:
         INTERACTIVE
     };
 
-    CommandLineInterface* cmdLine_ = nullptr;
+    SerialCommands* cmdLine_ = nullptr;
 
     Mode mode_ = CLI;
     PosCallback posCallback_ = nullptr;
