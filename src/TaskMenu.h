@@ -13,11 +13,11 @@ public:
 
     void start();
 
-    using PosCallback = void (*)(uint16_t);
+    using PosCallback = void (*)(int16_t);
     void setPosCallback(PosCallback callback);
     using LPosCallback = void (*)(float);
     void setLPosCallback(LPosCallback callback);
-    using InteractiveCallback = void (*)(uint16_t);
+    using InteractiveCallback = void (*)(int16_t);
     void setInteractiveCallback(InteractiveCallback callback);
     using SimAddressCallback = uint16_t (*)(uint16_t);
     void setSimAddressCallback(SimAddressCallback callback);
@@ -29,7 +29,8 @@ public:
         Load,
         Save,
         Clear,
-        Set
+        Set,
+        Remove
     };
 
     using LUTCallback = void (*)(LUTCommand, float, int16_t);

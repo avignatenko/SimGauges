@@ -8,9 +8,9 @@
 #include <TaskErrorLed.h>
 #include <TaskStepperX27Driver.h>
 
-#include <InterpolationLib.h>
-
 #include <EEPROM.h>
+#include <InterpolationLib.h>
+#include <StoredLUT.h>
 
 Scheduler taskManager;
 
@@ -42,100 +42,7 @@ void onButtonPressed(bool pressed)
         TaskErrorLed::instance().removeError(TaskErrorLed::ERROR_TEST_LED);
 }
 
-class StoredLUT : public Printable
-{
-public:
-    StoredLUT() {}
-
-    ~StoredLUT() {}
-
-    void resize(byte size)
-    {
-        clear();
-        create(size);
-    }
-
-    byte size() const { return size_; }
-
-    double* x() { return xValues_; }
-    double* y() { return yValues_; }
-
-    size_t printTo(Print& p) const override
-    {
-        size_t r = 0;
-
-        for (int i = 0; i < size_; ++i)
-        {
-            if (i > 0) r += p.println();
-            r += p.print(xValues_[i]);
-            r += p.print(' ');
-            r += p.print(yValues_[i]);
-        }
-        return r;
-    }
-
-    bool load()
-    {
-        int idx = kEEPROMLUTIndex;
-
-        byte size = 255;
-        EEPROM.get(idx, size);
-        if (size == 255) return false;
-
-        resize(size);
-
-        idx += sizeof(size_);
-        for (int i = 0; i < size_; ++i)
-        {
-            EEPROM.get(idx, xValues_[i]);
-            idx += sizeof(xValues_[i]);
-
-            EEPROM.get(idx, yValues_[i]);
-            idx += sizeof(yValues_[i]);
-        }
-
-        return true;
-    }
-
-    void save()
-    {
-        int idx = kEEPROMLUTIndex;
-        EEPROM.put(idx, size_);
-        idx += sizeof(size_);
-        for (int i = 0; i < size_; ++i)
-        {
-            EEPROM.put(idx, xValues_[i]);
-            idx += sizeof(xValues_[i]);
-
-            EEPROM.put(idx, yValues_[i]);
-            idx += sizeof(yValues_[i]);
-        }
-    }
-
-private:
-    void create(byte size)
-    {
-        xValues_ = new double[size];
-        yValues_ = new double[size];
-        size_ = size;
-    }
-    void clear()
-    {
-        delete[] xValues_;
-        xValues_ = nullptr;
-        delete[] yValues_;
-        yValues_ = nullptr;
-
-        size_ = 0;
-    }
-
-private:
-    double* xValues_ = nullptr;
-    double* yValues_ = nullptr;
-    byte size_ = 0;
-};
-
-StoredLUT s_lut;
+StoredLUT<kEEPROMLUTIndex> s_lut;
 
 void onSetValue(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len, byte* payload, void* data)
 {
@@ -152,7 +59,7 @@ void onSetValue(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddre
         static_cast<uint16_t>(Interpolation::ConstrainedSpline(s_lut.x(), s_lut.y(), s_lut.size(), pos)));
 }
 
-void onPosCommand(uint16_t pos)
+void onPosCommand(int16_t pos)
 {
     TaskStepperX27Driver::instance().setPosition(pos);
 }
@@ -164,10 +71,10 @@ void onLPosCommand(float pos)
     TaskStepperX27Driver::instance().setPosition(hwPos);
 }
 
-void onInteractiveCommand(uint16_t delta)
+void onInteractiveCommand(int16_t delta)
 {
     TaskStepperX27Driver& stp = TaskStepperX27Driver::instance();
-    uint16_t newPos = stp.position() + delta;
+    int16_t newPos = constrain(stp.position() + delta, 0, stp.totalSteps() - 1);
     stp.setPosition(newPos);
     Serial.println(newPos);
 }
@@ -187,24 +94,63 @@ void onLUTCommand(TaskMenu::LUTCommand cmd, float posl, int16_t pos)
     if (cmd == TaskMenu::LUTCommand::Show)
     {
         Serial.println(s_lut);
+        return;
     }
 
     if (cmd == TaskMenu::LUTCommand::Load)
     {
         s_lut.load();
+        Serial.println(s_lut);
         Serial.println("OK");
+        return;
     }
 
     if (cmd == TaskMenu::LUTCommand::Save)
     {
         s_lut.save();
         Serial.println("OK");
+        return;
     }
 
     if (cmd == TaskMenu::LUTCommand::Clear)
     {
-        s_lut.resize(0);
+        s_lut.clear();
         Serial.println("OK");
+        return;
+    }
+
+    if (cmd == TaskMenu::LUTCommand::Set)
+    {
+        if (pos < 0) pos = TaskStepperX27Driver::instance().position();
+
+        if (s_lut.size() == s_lut.maxSize())
+        {
+            Serial.println("Error: max LUT capacity reached");
+            return;
+        }
+
+        s_lut.addValue(posl, pos);
+
+        Serial.print("Set ");
+        Serial.print(posl);
+        Serial.print("->");
+        Serial.print(pos);
+        Serial.println(" OK");
+
+        Serial.println(s_lut);
+        return;
+    }
+
+    if (cmd == TaskMenu::LUTCommand::Remove)
+    {
+        s_lut.removeValue(posl);
+
+        Serial.print("Remove ");
+        Serial.print(posl);
+        Serial.println(" OK");
+
+        Serial.println(s_lut);
+        return;
     }
 }
 
@@ -241,29 +187,18 @@ void setup()
     TaskCAN::instance().setReceiveCallback(onSetValue, 0);
 
     // set some fake LUT
-
     bool hasLut = s_lut.load();
 
     if (!hasLut)
     {
-        s_lut.resize(6);
-        s_lut.x()[0] = 0.0;
-        s_lut.y()[0] = 0.0;
+        s_lut.clear();
 
-        s_lut.x()[1] = 40;
-        s_lut.y()[1] = 380;
-
-        s_lut.x()[2] = 60;
-        s_lut.y()[2] = 928;
-
-        s_lut.x()[3] = 80;
-        s_lut.y()[3] = 1417;
-
-        s_lut.x()[4] = 100;
-        s_lut.y()[4] = 1869;
-
-        s_lut.x()[5] = 200;
-        s_lut.y()[5] = 3657;
+        s_lut.addValue(0.0, 0.0);
+        s_lut.addValue(40, 380);
+        s_lut.addValue(60, 928);
+        s_lut.addValue(80, 1417);
+        s_lut.addValue(100, 1869);
+        s_lut.addValue(200, 3657);
     }
 
     TaskErrorLed::instance().start();

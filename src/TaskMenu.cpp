@@ -98,12 +98,25 @@ void TaskMenu::cmdLUTCallback(SerialCommands* sender)
         if (!poslStr)
         {
             sender->GetSerial()->println("Error: set needs logical position");
+            return;
         }
 
         posl = atof(poslStr);
 
         const char* posStr = sender->Next();
         if (posStr) pos = atoi(posStr);
+    }
+    if (strcmp(commandStr, "rm") == 0)
+    {
+        cmd = LUTCommand::Remove;
+        const char* poslStr = sender->Next();
+        if (!poslStr)
+        {
+            sender->GetSerial()->println("Error: set needs logical position");
+            return;
+        }
+
+        posl = atof(poslStr);
     }
     if (cmd == LUTCommand::Invalid)
     {
@@ -123,7 +136,7 @@ Help:
  q,Q,w,W - (single key commands) move motor needle (q,w - slow, Q,W - fast)
  lpos <position> - move motor to logical position
  addr <address> - change sim address for this device
- lut [show|load|save|clear|set] [valuel] [valuep] - modify LUT table for the motor 
+ lut [show|load|save|clear|set|rm] [valuel] [valuep] - modify LUT table for the motor 
 )=====";
 
     Stream* s = sender->GetSerial();
