@@ -39,12 +39,8 @@ public:
 private:
     TaskMenu(Scheduler& sh);
 
-    void updateDelay();
-
     void loopMenuCallback();
     static void loopMenuCallbackStatic();
-
-    void led(bool on);
 
     static void cmdPosCallback(SerialCommands* sender);
     static void errorCallback(SerialCommands* sender, const char* command);

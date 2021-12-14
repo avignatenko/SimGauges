@@ -46,15 +46,13 @@ StoredLUT<kEEPROMLUTIndex> s_lut;
 
 void onSetValue(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len, byte* payload, void* data)
 {
-    Log.traceln("onSetValue");
     if (len != 4)
-    {
-        Log.errorln("onSetValue: wrong len");
-        return;
-    }
+        {
+            return;
+        }
 
     float pos = *reinterpret_cast<float*>(payload);
-    Log.verboseln("Value: %f", pos);
+
     TaskStepperX27Driver::instance().setPosition(
         static_cast<uint16_t>(Interpolation::ConstrainedSpline(s_lut.x(), s_lut.y(), s_lut.size(), pos)));
 }
@@ -157,9 +155,6 @@ void onLUTCommand(TaskMenu::LUTCommand cmd, float posl, int16_t pos)
 void setup()
 {
     initSerial();
-
-    Log.begin(LOGLEVEL, &Serial);
-    Log.infoln("Started. Serial OK");
 
     TaskErrorLed::init(taskManager, LED_PORT);
     TaskStepperX27Driver::init(taskManager, STEPPER_STEP, STEPPER_DIR, STEPPER_RESET);

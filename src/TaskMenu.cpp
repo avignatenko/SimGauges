@@ -10,8 +10,6 @@ void TaskMenu::loopMenuCallbackStatic()
 
 void TaskMenu::loopMenuCallback()
 {
-    Log.traceln("TaskMenu::loopMenuCallback()");
-
     int received = Serial.peek();
     if (received >= 0) Serial.print((char)received);
 
@@ -129,7 +127,7 @@ void TaskMenu::cmdLUTCallback(SerialCommands* sender)
 
 void TaskMenu::cmdHelpCallback(SerialCommands* sender)
 {
-    static const char s_helpText[] = R"=====( 
+    static const __FlashStringHelper* a = F(R"=====( 
 Help: 
  help - this help text
  pos <position> - move motor to given position
@@ -137,24 +135,22 @@ Help:
  lpos <position> - move motor to logical position
  addr <address> - change sim address for this device
  lut [show|load|save|clear|set|rm] [valuel] [valuep] - modify LUT table for the motor 
-)=====";
+)=====");
 
     Stream* s = sender->GetSerial();
-    s->println(s_helpText);
+    s->println(a);
 }
 
 // Callback in case of an error
 void TaskMenu::errorCallback(SerialCommands* sender, const char* command)
 {
-    sender->GetSerial()->print("Unrecognized command [");
+    sender->GetSerial()->print(F("Unrecognized command ["));
     sender->GetSerial()->print(command);
-    sender->GetSerial()->println("]");
+    sender->GetSerial()->println(F("]"));
 }
 
 TaskMenu::TaskMenu(Scheduler& sh) : task_(TASK_IMMEDIATE, TASK_FOREVER, &loopMenuCallbackStatic, &sh, false)
 {
-    Log.traceln("TaskMenu::TaskMenu()");
-
     static char s_serial_command_buffer[32];
     cmdLine_ = new SerialCommands(&Serial, s_serial_command_buffer, sizeof(s_serial_command_buffer), "\r\n", " ");
 
@@ -190,8 +186,6 @@ void TaskMenu::init(Scheduler& sh)
 
 void TaskMenu::start()
 {
-    Log.traceln("TaskMenu::start()");
-
     task_.enable();
 }
 
