@@ -26,7 +26,7 @@ void TaskMenu::cmdPosCallback(SerialCommands* sender)
         posStr = "0";
     }
 
-    int pos = atoi(posStr);
+    int32_t pos = atol(posStr);
 
     if (TaskMenu::instance().posCallback_) TaskMenu::instance().posCallback_(pos);
 }

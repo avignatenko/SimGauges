@@ -13,7 +13,7 @@ public:
 
     void start();
 
-    using PosCallback = void (*)(int16_t);
+    using PosCallback = void (*)(int32_t);
     void setPosCallback(PosCallback callback);
     using LPosCallback = void (*)(float);
     void setLPosCallback(LPosCallback callback);
