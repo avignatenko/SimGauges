@@ -209,7 +209,7 @@ void TaskMenu::setSimAddressCallback(SimAddressCallback callback)
     simAddressCallback_ = callback;
 }
 
-void TaskMenu::setLUTCallback(SimAddressCallback callback)
+void TaskMenu::setLUTCallback(LUTCallback callback)
 {
     lutCallback_ = callback;
 }

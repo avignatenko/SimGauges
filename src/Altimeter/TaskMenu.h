@@ -34,7 +34,7 @@ public:
     };
 
     using LUTCallback = void (*)(LUTCommand, float, int16_t);
-    void setLUTCallback(SimAddressCallback callback);
+    void setLUTCallback(LUTCallback callback);
 
 private:
     TaskMenu(Scheduler& sh);

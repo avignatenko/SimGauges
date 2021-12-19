@@ -57,7 +57,7 @@ void onSetValue(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddre
         static_cast<uint16_t>(Interpolation::ConstrainedSpline(s_lut.x(), s_lut.y(), s_lut.size(), pos)));
 }
 
-void onPosCommand(int16_t pos)
+void onPosCommand(int32_t pos)
 {
     TaskStepperX27Driver::instance().setPosition(pos);
 }
@@ -72,7 +72,7 @@ void onLPosCommand(float pos)
 void onInteractiveCommand(int16_t delta)
 {
     TaskStepperX27Driver& stp = TaskStepperX27Driver::instance();
-    int16_t newPos = constrain(stp.position() + delta, 0, stp.totalSteps() - 1);
+    int16_t newPos = constrain(stp.position() + delta, 0, (int16_t)(stp.totalSteps() - 1));
     stp.setPosition(newPos);
     Serial.println(newPos);
 }

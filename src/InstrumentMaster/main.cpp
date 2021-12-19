@@ -22,7 +22,7 @@ const uint16_t kSimAddress = 1;  // master 1
 
 void initSerial()
 {
-    Serial.begin(115200);
+    Serial.begin(9600);
     while (!Serial)
         ;
 }

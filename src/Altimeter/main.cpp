@@ -12,7 +12,7 @@
 #include <InterpolationLib.h>
 #include <StoredLUT.h>
 
-#include <Ewma.h>
+#include <GyverFilters.h>
 
 Scheduler taskManager;
 
@@ -159,21 +159,19 @@ void loopTest2()
 {
     pinMode(A5, INPUT);
     int resRaw = analogRead(A5);
-    Serial.println(resRaw);
+    // Serial.println(resRaw);
 }
 void loopKnob()
 {
-    pinMode(A4, INPUT);
+    pinMode(A4, INPUT_PULLUP);
     int resRaw = analogRead(A4);
-    // exp filter
-    static Ewma filter(0.1);
-    float res = filter.filter(resRaw);
+
     // Serial.println(res);
 
-    // 31.0 -> 0
-    // 28 -> 817
+    // 31.0 -> 15
+    // 28 -> 850
 
-    float p = res * (28.0 - 31.0) / 817 + 31.0;
+    float p = (resRaw - 15) * (28.0 - 31.0) / (850 - 15) + 31.0;
 
     float p0 = 29.92;
     // float p = 31;
@@ -183,21 +181,29 @@ void loopKnob()
     float h = 145366.45 * (1 - pow(p / p0, 0.190284));
     // Serial.println(h);
 
-    // int32_t pos = TaskStepperTMC2208::instance().position();
-    TaskStepperTMC2208::instance().setPosition(h * 16 * 200 / 1000);
-}
-Task taskKnob(TASK_IMMEDIATE, TASK_FOREVER, &loopKnob, &taskManager, false);
+    int posRaw = h * 16 * 200 / 1000;
 
-void initSensor();
+    // exp filter
+    static GMedian<30, int> filterMed;
+    static GFilterRA filter(0.01);
+    int pos = filter.filtered(posRaw);
+
+    // int32_t pos = TaskStepperTMC2208::instance().position();
+    TaskStepperTMC2208::instance().setPosition(pos);
+    //Serial.println(p);
+}
+Task taskKnob(1 * TASK_MILLISECOND, TASK_FOREVER, &loopKnob, &taskManager, false);
+
+bool initSensor();
 
 Task taskTest(TASK_IMMEDIATE, TASK_FOREVER, nullptr, &taskManager, false, initSensor);
 Task taskTest2(500 * TASK_MILLISECOND, TASK_FOREVER, &loopTest2, &taskManager, true);
 
 float readSensorFiltered()
 {
-    float res_raw = analogRead(A3);
-    static Ewma filter(0.8);
-    float res = filter.filter(res_raw);
+    int res_raw = analogRead(A3);
+    static GFilterRA filter(0.8);
+    int res = filter.filtered(res_raw);
 
     return res * 5.0 / 1023.0;
 }
@@ -276,12 +282,14 @@ void sensorMoveAwayFromMarkerInit()
     taskTest.setCallback(sensorMoveAwayFromMarker);
 }
 
-void initSensor()
+bool initSensor()
 {
     Serial.println("initSensor");
     pinMode(A3, INPUT);
     taskTest.setCallback(sensorMoveAwayFromMarkerInit);
     taskTest.enable();
+
+    return true;
 }
 
 void setup()
