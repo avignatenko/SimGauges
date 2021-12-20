@@ -1,7 +1,7 @@
 
 #include <Common.h>
 
-#include "TaskMenu.h"
+#include "TaskAltimeterMenu.h"
 
 #include <TaskButton.h>
 #include <TaskCAN.h>
@@ -90,71 +90,6 @@ uint16_t onSimAddrCommand(uint16_t addr)
     return addr;
 }
 
-void onLUTCommand(TaskMenu::LUTCommand cmd, float posl, int16_t pos)
-{
-    if (cmd == TaskMenu::LUTCommand::Show)
-    {
-        Serial.println(s_lut);
-        return;
-    }
-
-    if (cmd == TaskMenu::LUTCommand::Load)
-    {
-        s_lut.load();
-        Serial.println(s_lut);
-        Serial.println("OK");
-        return;
-    }
-
-    if (cmd == TaskMenu::LUTCommand::Save)
-    {
-        s_lut.save();
-        Serial.println("OK");
-        return;
-    }
-
-    if (cmd == TaskMenu::LUTCommand::Clear)
-    {
-        s_lut.clear();
-        Serial.println("OK");
-        return;
-    }
-
-    if (cmd == TaskMenu::LUTCommand::Set)
-    {
-        if (pos < 0) pos = TaskStepperTMC2208::instance().position();
-
-        if (s_lut.size() == s_lut.maxSize())
-        {
-            Serial.println("Error: max LUT capacity reached");
-            return;
-        }
-
-        s_lut.addValue(posl, pos);
-
-        Serial.print("Set ");
-        Serial.print(posl);
-        Serial.print("->");
-        Serial.print(pos);
-        Serial.println(" OK");
-
-        Serial.println(s_lut);
-        return;
-    }
-
-    if (cmd == TaskMenu::LUTCommand::Remove)
-    {
-        s_lut.removeValue(posl);
-
-        Serial.print("Remove ");
-        Serial.print(posl);
-        Serial.println(" OK");
-
-        Serial.println(s_lut);
-        return;
-    }
-}
-
 void loopTest2()
 {
     pinMode(A5, INPUT);
@@ -184,7 +119,6 @@ void loopKnob()
     int posRaw = h * 16 * 200 / 1000;
 
     // exp filter
-    static GMedian<30, int> filterMed;
     static GFilterRA filter(0.01);
     int pos = filter.filtered(posRaw);
 
@@ -227,35 +161,6 @@ void sensorFinalizeInit()
     taskTest.setCallback(sensorFinalize);
 }
 
-/*
-void sensorFindMarkerSlow()
-{
-    if (readSensorFiltered() > 2) taskTest.setCallback(sensorFinalizeInit);
-}
-
-void sensorFindMarkerSlowInit()
-{
-    Serial.println("sensorFindMarkerSlowInit");
-    TaskStepperTMC2208::instance().setSpeed(100);
-    TaskStepperTMC2208::instance().setPosition(TaskStepperTMC2208::instance().position() -
-                                               200L * 10 * 10 * 16);  // full circle
-    taskTest.setCallback(sensorFindMarkerSlow);
-}
-
-void sensorMoveAwayFromMarker2()
-{
-    if (TaskStepperTMC2208::instance().position() == TaskStepperTMC2208::instance().targetPosition())
-        taskTest.setCallback(sensorFindMarkerSlowInit);
-}
-
-void sensorMoveAwayFromMarker2Init()
-{
-    Serial.println("sensorMoveAwayFromMarker2Init");
-    TaskStepperTMC2208::instance().setPosition(TaskStepperTMC2208::instance().position() +
-                                               200 * 16 * 1 / 2);  // 2 circles max
-    taskTest.setCallback(sensorMoveAwayFromMarker2);
-}
-*/
 void sensorFindMarkerFast()
 {
     if (readSensorFiltered() > 2) taskTest.setCallback(sensorFinalizeInit);
@@ -300,13 +205,11 @@ void setup()
     TaskStepperTMC2208::init(taskManager, STEPPER_STEP, STEPPER_DIR, STEPPER_RESET, 100, 100);
     TaskButton::init(taskManager, BUTTON_PORT);
     TaskButton::instance().setPressedCallback(onButtonPressed);
-    TaskMenu::init(taskManager);
-    TaskMenu::instance().setPosCallback(onPosCommand);
-    TaskMenu::instance().setInteractiveCallback(onInteractiveCommand);
-    TaskMenu::instance().setLPosCallback(onLPosCommand);
+    TaskAltimeterMenu::init(taskManager);
+    TaskAltimeterMenu::instance().setPosCallback(onPosCommand);
+    TaskAltimeterMenu::instance().setInteractiveCallback(onInteractiveCommand);
     TaskMenu::instance().setSimAddressCallback(onSimAddrCommand);
-    TaskMenu::instance().setLUTCallback(onLUTCommand);
-
+    
     uint16_t kSimAddress = 0;
 
     EEPROM.get(kEEPROMAddrIndex, kSimAddress);
