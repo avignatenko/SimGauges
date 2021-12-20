@@ -163,15 +163,15 @@ void loopTest2()
 }
 void loopKnob()
 {
-    pinMode(A4, INPUT_PULLUP);
+    pinMode(A4, INPUT);
     int resRaw = analogRead(A4);
 
-    // Serial.println(res);
+    //Serial.println(resRaw);
 
-    // 31.0 -> 15
-    // 28 -> 850
+    // 31.0 -> 0
+    // 28 -> 820
 
-    float p = (resRaw - 15) * (28.0 - 31.0) / (850 - 15) + 31.0;
+    float p = (resRaw - 0) * (28.0 - 31.0) / (820 - 0) + 31.0;
 
     float p0 = 29.92;
     // float p = 31;
