@@ -27,6 +27,7 @@ const int STEPPER_DIR = A1;
 const int STEPPER_RESET = A2;
 
 const int kEEPROMAddrIndex = 0;
+const int kEEPROMCal0Index = kEEPROMAddrIndex + sizeof(uint16_t);
 const int kEEPROMLUTIndex = 5;
 
 void initSerial()
@@ -80,14 +81,35 @@ void onInteractiveCommand(int16_t delta)
     Serial.println(newPos);
 }
 
-uint16_t onSimAddrCommand(uint16_t addr)
+void onAddrVarSet(float value)
 {
-    if (addr == 0) return TaskCAN::instance().simAddress();
-
     // write to eeprom
+    uint16_t addr = (uint16_t)value;
     EEPROM.put(kEEPROMAddrIndex, addr);
     TaskCAN::instance().setSimAddress(addr);
+}
+
+float onAddrVarGet()
+{
+    uint16_t addr = 65535;
+    EEPROM.get(kEEPROMAddrIndex, addr);
+    if (addr == 65535) addr = 1023;
     return addr;
+}
+
+float onCal0VarGet()
+{
+    int32_t cal0 = 65535;
+    EEPROM.get(kEEPROMCal0Index, cal0);
+    if (cal0 == 65535) cal0 = 0;
+    return cal0;
+}
+
+void onCal0VarSet(float value)
+{
+    // write to eeprom
+    int32_t cal0 = (int32_t)value;
+    EEPROM.put(kEEPROMCal0Index, cal0);
 }
 
 void loopTest2()
@@ -109,12 +131,9 @@ void loopKnob()
     float p = (resRaw - 0) * (28.0 - 31.0) / (820 - 0) + 31.0;
 
     float p0 = 29.92;
-    // float p = 31;
-    // float h = 44330 * (1 - pow(p / p0, (1 / 5.255))) / 3.28084;
 
     // https://en.wikipedia.org/wiki/Pressure_altitude
     float h = 145366.45 * (1 - pow(p / p0, 0.190284));
-    // Serial.println(h);
 
     int posRaw = h * 16 * 200 / 1000;
 
@@ -122,9 +141,7 @@ void loopKnob()
     static GFilterRA filter(0.01);
     int pos = filter.filtered(posRaw);
 
-    // int32_t pos = TaskStepperTMC2208::instance().position();
     TaskStepperTMC2208::instance().setPosition(pos);
-    //Serial.println(p);
 }
 Task taskKnob(1 * TASK_MILLISECOND, TASK_FOREVER, &loopKnob, &taskManager, false);
 
@@ -155,9 +172,8 @@ void sensorFinalize()
 void sensorFinalizeInit()
 {
     Serial.println("sensorFinalizeInit");
-    // TaskStepperTMC2208::instance().setSpeed(2500);
-    TaskStepperTMC2208::instance().setPosition(TaskStepperTMC2208::instance().position() + 11991 + 19 + 28 - 1018 -
-                                               100 - 9 - 48);
+    // 10863
+    TaskStepperTMC2208::instance().setPosition(TaskStepperTMC2208::instance().position() + onCal0VarGet());
     taskTest.setCallback(sensorFinalize);
 }
 
@@ -208,18 +224,10 @@ void setup()
     TaskAltimeterMenu::init(taskManager);
     TaskAltimeterMenu::instance().setPosCallback(onPosCommand);
     TaskAltimeterMenu::instance().setInteractiveCallback(onInteractiveCommand);
-    TaskMenu::instance().setSimAddressCallback(onSimAddrCommand);
-    
-    uint16_t kSimAddress = 0;
+    TaskMenu::instance().addVar("addr", onAddrVarGet, onAddrVarSet);
+    TaskMenu::instance().addVar("cal0", onCal0VarGet, onCal0VarSet);
 
-    EEPROM.get(kEEPROMAddrIndex, kSimAddress);
-    if (kSimAddress == 65535)
-    {
-        kSimAddress = 1023;
-        EEPROM.put(kEEPROMAddrIndex, kSimAddress);
-    }
-
-    TaskCAN::init(taskManager, MCP2515_SPI_PORT, MCP2515_INT_PIN, kSimAddress);
+    TaskCAN::init(taskManager, MCP2515_SPI_PORT, MCP2515_INT_PIN, onAddrVarGet());
 
     // port 0: set arrow position
     TaskCAN::instance().setReceiveCallback(onSetValue, 0);
