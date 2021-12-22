@@ -1,8 +1,6 @@
 
 #include <Common.h>
 
-#include "TaskAltimeterMenu.h"
-
 #include <BasicInstrument.h>
 #include <TaskButton.h>
 #include <TaskCAN.h>
@@ -96,13 +94,18 @@ void onCal0VarSet(float value)
 class TaskCalibrate : public Task
 {
 public:
-    TaskCalibrate(TaskStepperTMC2208& stepper, Task& taskKnob, unsigned long aInterval = 0, long aIterations = 0,
-                  Scheduler* aScheduler = NULL, bool aEnable = false)
-        : Task(aInterval, aIterations, aScheduler, aEnable), stepper_(stepper), taskKnob_(taskKnob)
+    TaskCalibrate(TaskStepperTMC2208& stepper, Task& taskKnob, int32_t calibration, unsigned long aInterval = 0,
+                  long aIterations = 0, Scheduler* aScheduler = NULL, bool aEnable = false)
+        : Task(aInterval, aIterations, aScheduler, aEnable),
+          stepper_(stepper),
+          taskKnob_(taskKnob),
+          calibration_(calibration)
     {
     }
 
     virtual bool Callback() override { return (this->*callback_)(); }
+
+    void setCalibration(int32_t calibration) { calibration_ = calibration; }
 
 private:
     bool initSensor()
@@ -140,7 +143,7 @@ private:
     {
         Serial.println("sensorFinalizeInit");
         // 10863
-        stepper_.setPosition(stepper_.position() + 10863);  // onCal0VarGet());
+        stepper_.setPosition(stepper_.position() + calibration_);;
 
         callback_ = &TaskCalibrate::sensorFinalize;
 
@@ -184,6 +187,7 @@ private:
     TaskStepperTMC2208& stepper_;
     Task& taskKnob_;
     bool (TaskCalibrate::*callback_)() = &TaskCalibrate::initSensor;
+    int32_t calibration_;
 };
 
 class TaskKnob : public Task
@@ -199,8 +203,6 @@ public:
     {
         pinMode(A4, INPUT);
         int resRaw = analogRead(A4);
-
-        // Serial.println(resRaw);
 
         // 31.0 -> 0
         // 28 -> 820
@@ -234,9 +236,13 @@ public:
         : BasicInstrument(ledPin, buttonPin, canSPIPin, canIntPin),
           taskStepper_(taskManager_, STEPPER_STEP, STEPPER_DIR, STEPPER_RESET, 100, 100),
           taskKnob_(taskStepper_, 1 * TASK_MILLISECOND, TASK_FOREVER, &taskManager_, false),
-          taskCalibrate_(taskStepper_, taskKnob_, TASK_IMMEDIATE, TASK_FOREVER, &taskManager_, false)
+          taskCalibrate_(taskStepper_, taskKnob_, 0, TASK_IMMEDIATE, TASK_FOREVER, &taskManager_, false)
     {
         taskCAN_.setReceiveCallback(fastdelegate::MakeDelegate(this, &Altimeter::onSetValue));
+
+        varCal0Idx_ = addVar("cal0");
+
+        taskCalibrate_.setCalibration(getVar(varCal0Idx_));
     }
 
     void setup()
@@ -246,12 +252,13 @@ public:
         Serial.println("Altimeter::setup()");
         taskStepper_.start();
         taskCalibrate_.enable();
+
         /*
                 TaskAltimeterMenu::init(taskManager_);
                 TaskAltimeterMenu::instance().setPosCallback(onPosCommand);
                 TaskAltimeterMenu::instance().setInteractiveCallback(onInteractiveCommand);
                 TaskAltimeterMenu::instance().addVar("addr", onAddrVarGet, onAddrVarSet);
-                TaskAltimeterMenu::instance().addVar("cal0", onCal0VarGet, onCal0VarSet);
+
 
                 // port 0: set arrow position
                 taskCAN_.setReceiveCallback(onSetValue, 0);*/
@@ -272,7 +279,13 @@ public:
                 }
 
                */
-        // TaskMenu::instance().start();
+    }
+
+protected:
+    virtual void onVarSet(int idx, float value)
+    {
+        BasicInstrument::onVarSet(idx, value);
+        if (idx == varCal0Idx_) taskCalibrate_.setCalibration(value);
     }
 
 private:
@@ -293,6 +306,8 @@ private:
     TaskStepperTMC2208 taskStepper_;
     TaskKnob taskKnob_;
     TaskCalibrate taskCalibrate_;
+
+    byte varCal0Idx_ = 0;
 };
 
 Altimeter s_instrument(LED_PORT, BUTTON_PORT, MCP2515_SPI_PORT, MCP2515_INT_PIN);
