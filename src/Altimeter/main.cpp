@@ -27,7 +27,7 @@ const int kEEPROMAddrIndex = 0;
 const int kEEPROMCal0Index = kEEPROMAddrIndex + sizeof(uint16_t);
 const int kEEPROMLUTIndex = 5;
 
-StoredLUT<kEEPROMLUTIndex> s_lut;
+//StoredLUT s_lut(10);
 
 /*
 
