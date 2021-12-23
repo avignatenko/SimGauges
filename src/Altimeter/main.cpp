@@ -199,34 +199,52 @@ public:
     {
     }
 
-    virtual bool Callback() override
+    void setLUT(StoredLUT* lut) { lut_ = lut; }
+    int knobValue()
     {
         pinMode(A4, INPUT);
         int resRaw = analogRead(A4);
+        // exp filter
+        static GFilterRA filter(0.01);
+        int res = filter.filtered(resRaw);
+        return res;
+    }
 
+    int pos()
+    {
         // 31.0 -> 0
         // 28 -> 820
 
-        float p = (resRaw - 0) * (28.0 - 31.0) / (820 - 0) + 31.0;
+        // float p = (knobValue() - 0) * (28.0 - 31.0) / (820 - 0) + 31.0;
 
+        float p = Interpolation::ConstrainedSpline(lut_->x(), lut_->y(), lut_->size(), knobValue());
+       
         float p0 = 29.92;
 
         // https://en.wikipedia.org/wiki/Pressure_altitude
         float h = 145366.45 * (1 - pow(p / p0, 0.190284));
 
-        int posRaw = h * 16 * 200 / 1000;
+        int pos = h * 16 * 200 / 1000;
+        //
+        Serial.println(pos);
+        return pos;
+    }
 
-        // exp filter
-        static GFilterRA filter(0.01);
-        int pos = filter.filtered(posRaw);
+    void setStepperLink(bool link) { stepperLink_ = link; }
 
-        stepper_.setPosition(pos);
-
+    virtual bool Callback() override
+    {
+        if (stepperLink_)
+            stepper_.setPosition(pos());
+        else
+            knobValue();
         return true;
     }
 
 private:
     TaskStepperTMC2208& stepper_;
+    bool stepperLink_ = false;
+    StoredLUT* lut_ = nullptr;
 };
 
 class Altimeter : public BasicInstrument
@@ -241,8 +259,14 @@ public:
         taskCAN_.setReceiveCallback(fastdelegate::MakeDelegate(this, &Altimeter::onSetValue));
 
         varCal0Idx_ = addVar("cal0");
+        varKnobOn_ = addVar("knob");
 
         taskCalibrate_.setCalibration(getVar(varCal0Idx_));
+        taskKnob_.setStepperLink(getVar(varKnobOn_));
+
+        lutKIdx_ = addLUT("k", 10);
+
+        taskKnob_.setLUT(&getLUT(lutKIdx_));
     }
 
     void setup()
@@ -282,11 +306,14 @@ public:
     }
 
 protected:
-    virtual void onVarSet(int idx, float value)
+    virtual void onVarSet(int idx, float value) override
     {
         BasicInstrument::onVarSet(idx, value);
         if (idx == varCal0Idx_) taskCalibrate_.setCalibration(value);
+        if (idx == varKnobOn_) taskKnob_.setStepperLink(value < 1 ? false : true);
     }
+
+    virtual int32_t posForLut(int idx) override { return taskKnob_.knobValue(); }
 
 private:
     void onSetValue(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len, byte* payload)
@@ -308,6 +335,8 @@ private:
     TaskCalibrate taskCalibrate_;
 
     byte varCal0Idx_ = 0;
+    byte varKnobOn_ = 0;
+    byte lutKIdx_ = 0;
 };
 
 Altimeter s_instrument(LED_PORT, BUTTON_PORT, MCP2515_SPI_PORT, MCP2515_INT_PIN);
