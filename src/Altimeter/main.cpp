@@ -52,44 +52,7 @@ void onInteractiveCommand(int16_t delta)
     stp.setPosition(newPos);
     Serial.println(newPos);
 }
-
-void onAddrVarSet(float value)
-{
-    // write to eeprom
-    uint16_t addr = (uint16_t)value;
-    EEPROM.put(kEEPROMAddrIndex, addr);
-    TaskCAN::instance().setSimAddress(addr);
-}
-
-float onAddrVarGet()
-{
-    uint16_t addr = 65535;
-    EEPROM.get(kEEPROMAddrIndex, addr);
-    if (addr == 65535) addr = 1023;
-    return addr;
-}
-
-float onCal0VarGet()
-{
-    int32_t cal0 = 65535;
-    EEPROM.get(kEEPROMCal0Index, cal0);
-    if (cal0 == 65535) cal0 = 0;
-    return cal0;
-}
-
-void onCal0VarSet(float value)
-{
-    // write to eeprom
-    int32_t cal0 = (int32_t)value;
-    EEPROM.put(kEEPROMCal0Index, cal0);
-}
 */
-// void loopTest2()
-//{
-//    pinMode(A5, INPUT);
-//    int resRaw = analogRead(A5);
-//    // Serial.println(resRaw);
-//}
 
 class TaskCalibrate : public Task
 {
@@ -226,7 +189,7 @@ public:
 
         int pos = h * 16 * 200 / 1000;
         //
-        Serial.println(pos);
+        //Serial.println(pos);
         return pos;
     }
 
@@ -280,8 +243,6 @@ public:
         /*
                 TaskAltimeterMenu::init(taskManager_);
                 TaskAltimeterMenu::instance().setPosCallback(onPosCommand);
-                TaskAltimeterMenu::instance().setInteractiveCallback(onInteractiveCommand);
-                TaskAltimeterMenu::instance().addVar("addr", onAddrVarGet, onAddrVarSet);
 
 
                 // port 0: set arrow position
@@ -314,6 +275,12 @@ protected:
     }
 
     virtual int32_t posForLut(int idx) override { return taskKnob_.knobValue(); }
+
+    virtual void setPos(byte idx, int32_t value, bool absolute) override
+    {
+        int32_t pos = (absolute ? value : taskStepper_.position() + value);
+        taskStepper_.setPosition(pos);
+    }
 
 private:
     void onSetValue(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len, byte* payload)
