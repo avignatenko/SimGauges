@@ -34,8 +34,6 @@ public:
           taskKnob_(taskStepper_, 1 * TASK_MILLISECOND, TASK_FOREVER, &taskManager_, false),
           taskCalibrate_(taskStepper_, taskKnob_.task(), 0, TASK_IMMEDIATE, TASK_FOREVER, &taskManager_, false)
     {
-        taskCAN_.setReceiveCallback(fastdelegate::MakeDelegate(this, &Altimeter::onSetValue));
-
         varCal0Idx_ = addVar("cal0");
         varKnobOn_ = addVar("knob");
 
@@ -74,12 +72,10 @@ protected:
     }
 
 private:
-    void onSetValue(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len, byte* payload)
+    virtual void onCANReceived(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len,
+                               byte* payload) override
     {
-        if (len != 4)
-        {
-            return;
-        }
+        if (len != 4) return;
 
         float pos = *reinterpret_cast<float*>(payload);
 
