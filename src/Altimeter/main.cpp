@@ -55,9 +55,10 @@ public:
     }
 
 protected:
-    virtual void onVarSet(int idx, float value) override
+    virtual void setVar(byte idx, float value) override
     {
-        BasicInstrument::onVarSet(idx, value);
+        BasicInstrument::setVar(idx, value);
+
         if (idx == varCal0Idx_) taskCalibrate_.setCalibration(value);
         if (idx == varKnobOn_) taskKnob_.setStepperLink(value < 1 ? false : true);
     }
@@ -66,6 +67,8 @@ protected:
 
     virtual void setPos(byte idx, int32_t value, bool absolute) override
     {
+        BasicInstrument::setPos(idx, value, absolute);
+
         int32_t pos = (absolute ? value : taskStepper_.position() + value);
         taskStepper_.setPosition(pos);
     }
