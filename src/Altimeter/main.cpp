@@ -10,11 +10,6 @@
 #include <TaskErrorLed.h>
 #include <TaskStepperTMC2208.h>
 
-#include <EEPROM.h>
-#include <GyverFilters.h>
-#include <InterpolationLib.h>
-#include <StoredLUT.h>
-
 // hardware speficics
 const byte BUTTON_PORT = 7;
 const byte LED_PORT = 3;
