@@ -63,6 +63,7 @@ private:
         if (len != 4) return;
 
         float pos = *reinterpret_cast<float*>(payload);
+        setLPos(0, pos, true);
     }
 
 private:
