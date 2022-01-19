@@ -1,7 +1,7 @@
 #include "TaskKnob.h"
 
 #include <GyverFilters.h>
-#include <InterpolationLib.h>
+#include <Interpolation.h>
 #include <StoredLUT.h>
 #include <TaskStepperTMC2208.h>
 
@@ -32,7 +32,7 @@ int TaskKnob::pos()
 
     // float p = (knobValue() - 0) * (28.0 - 31.0) / (820 - 0) + 31.0;
 
-    float p = Interpolation::ConstrainedSpline(lut_->x(), lut_->y(), lut_->size(), knobValue());
+    float p = cubicInterpolate<double, double>(lut_->x(), lut_->y(), lut_->size(), knobValue());
 
     // https://en.wikipedia.org/wiki/Pressure_altitude
     float h = 145366.45 * (1 - pow(p / pressure_, 0.190284));

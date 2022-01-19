@@ -56,7 +56,8 @@ protected:
         if (idx == varKnobOn_) taskKnob_.setStepperLink(value < 1 ? false : true);
     }
 
-    virtual int32_t posForLut(int idx) override { return taskKnob_.knobValue(); }
+    virtual int32_t posForLut(byte idx) override { return taskKnob_.knobValue(); }
+    virtual int32_t pos(byte idx) override { return taskKnob_.knobValue(); }
 
     virtual void setPos(byte idx, int32_t value, bool absolute) override
     {

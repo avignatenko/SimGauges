@@ -2,7 +2,7 @@
 #include <Common.h>
 
 #include <BasicInstrument.h>
-#include <InterpolationLib.h>
+#include <Interpolation.h>
 #include <TaskButton.h>
 #include <TaskCAN.h>
 #include <TaskErrorLed.h>
@@ -37,7 +37,8 @@ public:
 protected:
     virtual void setVar(byte idx, float value) override { BasicInstrument::setVar(idx, value); }
 
-    virtual int32_t posForLut(int idx) override { return taskStepper_.position(); }
+    virtual int32_t posForLut(byte idxLut) override { return taskStepper_.position(); }
+    virtual int32_t pos(byte idxPos) override { return taskStepper_.position(); }
 
     virtual void setPos(byte idx, int32_t value, bool absolute) override
     {
@@ -51,8 +52,8 @@ protected:
     {
         BasicInstrument::setLPos(idx, value, absolute);
 
-        StoredLUT& lut = getLUT(0);
-        int16_t p = (int16_t)(Interpolation::ConstrainedSpline(lut.x(), lut.y(), lut.size(), value));
+        StoredLUT& lut = getLUT(lutKIdx_);
+        int16_t p = (int16_t)(cubicInterpolate<double, double>(lut.x(), lut.y(), lut.size(), value));
         taskStepper_.setPosition(p);
     }
 
