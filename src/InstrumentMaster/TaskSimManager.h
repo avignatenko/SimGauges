@@ -9,7 +9,7 @@ class TaskErrorLed;
 class TaskSimManager : private Task
 {
 public:
-    TaskSimManager(TaskErrorLed& taskErrorLed, Scheduler& sh, byte channel);
+    TaskSimManager(TaskErrorLed* taskErrorLed, Scheduler& sh, byte channel);
 
     void start();
 
@@ -30,7 +30,8 @@ private:
 private:
     static TaskSimManager* instance_;
 
-    TaskErrorLed& taskErrorLed_;
+    TaskErrorLed* taskErrorLed_;
+    byte channel_;
     SiMessagePort* messagePort_;
     MessageCallback callback_;
     Print* debugPrinter_ = nullptr;

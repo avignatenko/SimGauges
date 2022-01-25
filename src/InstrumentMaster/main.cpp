@@ -28,7 +28,7 @@ public:
     InstrumentMaster(byte ledPin, byte buttonPin, byte canSPIPin, byte canIntPin, byte simManagerChannel,
                      byte simAddress)
         : CommonInstrument(ledPin, buttonPin, canSPIPin, canIntPin),
-          taskSimManager_(taskErrorLed_, taskManager_, simManagerChannel),
+          taskSimManager_(&taskErrorLed_, taskManager_, simManagerChannel),
           simAddress_(simAddress)
     {
         taskSimManager_.setReceivedFromHostCallback(fastdelegate::MakeDelegate(this, &InstrumentMaster::onHostMessage));

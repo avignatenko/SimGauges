@@ -36,20 +36,16 @@ private:
 
 TaskSimManager* TaskSimManager::instance_ = nullptr;
 
-TaskSimManager::TaskSimManager(TaskErrorLed& taskErrorLed, Scheduler& sh, byte channel)
-    : Task(TASK_IMMEDIATE, TASK_FOREVER, &sh, false), taskErrorLed_(taskErrorLed)
+TaskSimManager::TaskSimManager(TaskErrorLed* taskErrorLed, Scheduler& sh, byte channel)
+    : Task(TASK_IMMEDIATE, TASK_FOREVER, &sh, true), taskErrorLed_(taskErrorLed), channel_(channel)
 {
     instance_ = this;
-    // Log.traceln("TaskSimManager::TaskSimManager()");
-    messagePort_ = new SiMessagePort(SI_MESSAGE_PORT_DEVICE_ARDUINO_NANO, static_cast<SiMessagePortChannel>(channel),
-                                     simManagerCallbackStatic);
-#ifndef DISABLE_LOGGING
-    debugPrinter_ = new SimManagerDebugPrinter(*messagePort_);
-#endif
 }
 
 void TaskSimManager::start()
 {
+    messagePort_ = new SiMessagePort(SI_MESSAGE_PORT_DEVICE_ARDUINO_NANO, static_cast<SiMessagePortChannel>(channel_),
+                                     simManagerCallbackStatic);
     enable();
 }
 
@@ -63,7 +59,7 @@ void TaskSimManager::simManagerCallback(uint16_t message_id, struct SiMessagePor
 
     if (payload->type != SI_MESSAGE_PORT_DATA_TYPE_BYTE || payload->len > 8)
     {
-        taskErrorLed_.addError(TaskErrorLed::ERROR_HOST);
+        if (taskErrorLed_) taskErrorLed_->addError(TaskErrorLed::ERROR_HOST);
         return;
     }
 
@@ -96,7 +92,7 @@ bool TaskSimManager::Callback()
 void TaskSimManager::sendToHost(byte port, uint16_t fromSimAddress, byte len, byte* payload)
 {
     SiMessagePortResult result = messagePort_->SendMessage(toSimManagerMessageId(port, fromSimAddress), payload, len);
-    if (result != SI_MESSAGE_PORT_RESULT_OK) taskErrorLed_.addError(TaskErrorLed::ERROR_HOST);
+    if (result != SI_MESSAGE_PORT_RESULT_OK && taskErrorLed_) taskErrorLed_->addError(TaskErrorLed::ERROR_HOST);
 }
 
 void TaskSimManager::setReceivedFromHostCallback(MessageCallback callback)
