@@ -37,7 +37,7 @@ int TaskKnob::pos()
     // https://en.wikipedia.org/wiki/Pressure_altitude
     float h = 145366.45 * (1 - pow(p / pressure_, 0.190284));
 
-    int pos = h * 16 * 200 / 1000;
+    int pos = -h * 16 * 200 / 1000;
 
     return pos;
 }

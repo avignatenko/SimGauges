@@ -28,6 +28,19 @@ void TaskCalibrate::start()
     enable();
 }
 
+bool TaskCalibrate::OnEnable()
+{
+    stepper_.setSpeed(2500);
+    stepper_.setAcceleration(5000);
+    return true;
+}
+
+void TaskCalibrate::OnDisable()
+{
+    stepper_.setSpeed(7000);
+    stepper_.setAcceleration(8000);
+}
+
 bool TaskCalibrate::initSensor()
 {
     Serial.println("initSensor");

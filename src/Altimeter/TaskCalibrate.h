@@ -17,6 +17,9 @@ public:
     void start();
 
 private:
+    virtual bool OnEnable() override;
+    virtual void OnDisable() override;
+
     bool initSensor();
 
     float readSensorFiltered();

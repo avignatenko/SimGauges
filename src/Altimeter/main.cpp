@@ -25,7 +25,7 @@ class Altimeter : public BasicInstrument
 public:
     Altimeter(byte ledPin, byte buttonPin, byte canSPIPin, byte canIntPin)
         : BasicInstrument(ledPin, buttonPin, canSPIPin, canIntPin),
-          taskStepper_(taskManager_, STEPPER_STEP, STEPPER_DIR, STEPPER_RESET, 100, 100),
+          taskStepper_(taskManager_, STEPPER_STEP, STEPPER_DIR, STEPPER_RESET),
           taskKnob_(taskStepper_, 1 * TASK_MILLISECOND, TASK_FOREVER, &taskManager_, false),
           taskCalibrate_(taskStepper_, taskKnob_.task(), 0, TASK_IMMEDIATE, TASK_FOREVER, &taskManager_, false)
     {
