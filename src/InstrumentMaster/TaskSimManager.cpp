@@ -3,6 +3,8 @@
 
 #include <si_message_port.hpp>
 
+#define DISABLE_LOGGING
+
 namespace
 {
 uint16_t toSimManagerMessageId(byte port, uint16_t fromSimAddress)

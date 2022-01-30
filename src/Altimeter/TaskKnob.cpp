@@ -27,16 +27,10 @@ int TaskKnob::knobValue()
 
 int TaskKnob::pos()
 {
-    // 31.0 -> 0
-    // 28 -> 820
-
-    // float p = (knobValue() - 0) * (28.0 - 31.0) / (820 - 0) + 31.0;
-
     float p = cubicInterpolate<double, double>(lut_->x(), lut_->y(), lut_->size(), knobValue());
 
     // https://en.wikipedia.org/wiki/Pressure_altitude
     float h = 145366.45 * (1 - pow(p / pressure_, 0.190284));
-
     int pos = -h * 16 * 200 / 1000;
 
     return pos;
