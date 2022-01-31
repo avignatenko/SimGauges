@@ -3,13 +3,10 @@
 #include <GyverFilters.h>
 #include <TaskStepperTMC2208.h>
 
-TaskCalibrate::TaskCalibrate(TaskStepperTMC2208& stepper, Task& taskKnob, int32_t calibration,
-                             unsigned long aInterval = 0, long aIterations = 0, Scheduler* aScheduler = NULL,
-                             bool aEnable = false)
-    : Task(aInterval, aIterations, aScheduler, aEnable),
-      stepper_(stepper),
-      taskKnob_(taskKnob),
-      calibration_(calibration)
+TaskCalibrate::TaskCalibrate(TaskStepperTMC2208& stepper, int32_t calibration,
+                             unsigned long aInterval, long aIterations, Scheduler* aScheduler,
+                             bool aEnable)
+    : Task(aInterval, aIterations, aScheduler, aEnable), stepper_(stepper), calibration_(calibration)
 {
 }
 
@@ -66,7 +63,6 @@ bool TaskCalibrate::sensorFinalize()
     {
         stepper_.resetPosition(0);
         disable();
-        taskKnob_.enable();
     }
 
     return true;

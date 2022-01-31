@@ -26,18 +26,15 @@ public:
     Altimeter(byte ledPin, byte buttonPin, byte canSPIPin, byte canIntPin)
         : BasicInstrument(ledPin, buttonPin, canSPIPin, canIntPin),
           taskStepper_(taskManager_, STEPPER_STEP, STEPPER_DIR, STEPPER_RESET),
-          taskKnob_(taskStepper_, 1 * TASK_MILLISECOND, TASK_FOREVER, &taskManager_, false),
-          taskCalibrate_(taskStepper_, taskKnob_.task(), 0, TASK_IMMEDIATE, TASK_FOREVER, &taskManager_, false)
+          taskKnob_(20 * TASK_MILLISECOND, TASK_FOREVER, &taskManager_, false),
+          taskCalibrate_(taskStepper_, 0, TASK_IMMEDIATE, TASK_FOREVER, &taskManager_, false)
     {
         varCal0Idx_ = addVar("cal0");
-        varKnobOn_ = addVar("knob");
-
         taskCalibrate_.setCalibration(getVar(varCal0Idx_));
-        taskKnob_.setStepperLink(getVar(varKnobOn_));
 
         lutKIdx_ = addLUT("k", 10);
-
         taskKnob_.setLUT(&getLUT(lutKIdx_));
+        taskKnob_.setPressureCallback(fastdelegate::MakeDelegate(this, &Altimeter::onPressureKnobChanged));
     }
 
     void setup()
@@ -45,6 +42,7 @@ public:
         BasicInstrument::setup();
         taskStepper_.start();
         taskCalibrate_.start();
+        taskKnob_.start();
     }
 
 protected:
@@ -53,7 +51,6 @@ protected:
         BasicInstrument::setVar(idx, value);
 
         if (idx == varCal0Idx_) taskCalibrate_.setCalibration(value);
-        if (idx == varKnobOn_) taskKnob_.setStepperLink(value < 1 ? false : true);
     }
 
     virtual int32_t posForLut(byte idx) override { return taskKnob_.knobValue(); }
@@ -68,14 +65,25 @@ protected:
     }
 
 private:
+    void onPressureKnobChanged(float pressure)
+    {
+        Serial.print("pr: ");
+        Serial.println(pressure);
+        taskCAN_.sendMessage(0, 0, 0, sizeof(float), reinterpret_cast<byte*>(&pressure));
+    }
+
     virtual void onCANReceived(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len,
                                byte* payload) override
     {
         if (len != 4) return;
 
-        float pos = *reinterpret_cast<float*>(payload);
+        float h = *reinterpret_cast<float*>(payload);
 
-        taskKnob_.setPressure(pos);
+        if (port == 0 && !taskCalibrate_.isEnabled())  // set altimeter
+        {
+            int32_t pos = -h * 16 * 200 / 1000;
+            taskStepper_.setPosition(pos);
+        }
     }
 
 private:
@@ -84,7 +92,6 @@ private:
     TaskCalibrate taskCalibrate_;
 
     byte varCal0Idx_ = 0;
-    byte varKnobOn_ = 0;
     byte lutKIdx_ = 0;
 };
 

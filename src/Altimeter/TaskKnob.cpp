@@ -3,11 +3,10 @@
 #include <GyverFilters.h>
 #include <Interpolation.h>
 #include <StoredLUT.h>
-#include <TaskStepperTMC2208.h>
 
-TaskKnob::TaskKnob(TaskStepperTMC2208& stepper, unsigned long aInterval = 0, long aIterations = 0,
-                   Scheduler* aScheduler = NULL, bool aEnable = false)
-    : Task(aInterval, aIterations, aScheduler, aEnable), stepper_(stepper)
+TaskKnob::TaskKnob(unsigned long aInterval = 0, long aIterations = 0, Scheduler* aScheduler = NULL,
+                   bool aEnable = false)
+    : Task(aInterval, aIterations, aScheduler, aEnable)
 {
 }
 
@@ -15,43 +14,32 @@ void TaskKnob::setLUT(StoredLUT* lut)
 {
     lut_ = lut;
 }
-int TaskKnob::knobValue()
+
+int32_t TaskKnob::knobValue()
 {
     pinMode(A4, INPUT);
     int resRaw = analogRead(A4);
     // exp filter
-    static GFilterRA filter(0.01);
+    static GFilterRA filter(0.1);
     int res = filter.filtered(resRaw);
     return res;
 }
 
-int TaskKnob::pos()
+float TaskKnob::pressure()
 {
-    float p = cubicInterpolate<double, double>(lut_->x(), lut_->y(), lut_->size(), knobValue());
-
-    // https://en.wikipedia.org/wiki/Pressure_altitude
-    float h = 145366.45 * (1 - pow(p / pressure_, 0.190284));
-    int pos = -h * 16 * 200 / 1000;
-
-    return pos;
-}
-
-void TaskKnob::setStepperLink(bool link)
-{
-    stepperLink_ = link;
-}
-
-void TaskKnob::setPressure(float pressure)
-{
-    pressure_ = pressure;
+    return cubicInterpolate<double, double>(lut_->x(), lut_->y(), lut_->size(), knobValue());
 }
 
 bool TaskKnob::Callback()
 {
-    if (stepperLink_)
-        stepper_.setPosition(pos());
-    else
-        knobValue();
+    const float kThreshold = 0.005;  // 0.01 inHg
+    float lastPressure = pressure_;
+    float newPressure = pressure();
+    if (fabs(lastPressure - newPressure) > kThreshold)
+    {
+        pressure_ = newPressure;
+        if (pressureCallback_) pressureCallback_(newPressure);
+    }
     return true;
 }
 
@@ -60,7 +48,7 @@ void TaskKnob::start()
     enable();
 }
 
-Task& TaskKnob::task()
+void TaskKnob::setPressureCallback(fastdelegate::FastDelegate1<float> callback)
 {
-    return *this;
+    pressureCallback_ = callback;
 }

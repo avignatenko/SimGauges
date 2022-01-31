@@ -7,14 +7,16 @@ class TaskStepperTMC2208;
 class TaskCalibrate : private Task
 {
 public:
-    TaskCalibrate(TaskStepperTMC2208& stepper, Task& taskKnob, int32_t calibration, unsigned long aInterval = 0,
-                  long aIterations = 0, Scheduler* aScheduler = NULL, bool aEnable = false);
+    TaskCalibrate(TaskStepperTMC2208& stepper, int32_t calibration, unsigned long aInterval = 0, long aIterations = 0,
+                  Scheduler* aScheduler = NULL, bool aEnable = false);
 
     virtual bool Callback() override;
 
     void setCalibration(int32_t calibration);
 
     void start();
+
+    using Task::isEnabled;
 
 private:
     virtual bool OnEnable() override;
@@ -33,7 +35,6 @@ private:
 
 private:
     TaskStepperTMC2208& stepper_;
-    Task& taskKnob_;
     bool (TaskCalibrate::*callback_)() = &TaskCalibrate::initSensor;
     int32_t calibration_;
 };

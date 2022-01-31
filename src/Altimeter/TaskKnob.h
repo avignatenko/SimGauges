@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Common.h>
+#include <FastDelegate.h>
 
 class TaskStepperTMC2208;
 class StoredLUT;
@@ -8,24 +9,21 @@ class StoredLUT;
 class TaskKnob : private Task
 {
 public:
-    TaskKnob(TaskStepperTMC2208& stepper, unsigned long aInterval = 0, long aIterations = 0,
-             Scheduler* aScheduler = NULL, bool aEnable = false);
+    TaskKnob(unsigned long aInterval = 0, long aIterations = 0, Scheduler* aScheduler = NULL, bool aEnable = false);
 
     void setLUT(StoredLUT* lut);
-    int knobValue();
+    float pressure();
+    int32_t knobValue();
+    void setPressureCallback(fastdelegate::FastDelegate1<float> callback);
 
-    int pos();
-
-    void setStepperLink(bool link);
-    void setPressure(float pressure);
-    virtual bool Callback() override;
     void start();
 
+private:
+    virtual bool Callback() override;
     Task& task();
 
 private:
-    TaskStepperTMC2208& stepper_;
-    bool stepperLink_ = false;
     StoredLUT* lut_ = nullptr;
-    float pressure_ = 29.92;
+    fastdelegate::FastDelegate1<float> pressureCallback_;
+    float pressure_ = -1.0;
 };
