@@ -81,7 +81,7 @@ private:
 
         if (port == 0 && !taskCalibrate_.isEnabled())  // set altimeter
         {
-            int32_t pos = -h * 16 * 200 / 1000;
+            int32_t pos = h * 16 * 200 / 1000;
             taskStepper_.setPosition(pos);
         }
     }

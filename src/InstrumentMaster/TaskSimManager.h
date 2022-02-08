@@ -6,6 +6,8 @@
 class SiMessagePort;
 class TaskErrorLed;
 
+#define USE_SIMESSAGE 1
+
 class TaskSimManager : private Task
 {
 public:

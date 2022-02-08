@@ -8,8 +8,6 @@
 #include <TaskErrorLed.h>
 #include "TaskSimManager.h"
 
-#define USE_SIMESSAGE 1
-
 // hardware speficics
 const int BUTTON_PORT = 7;
 const int LED_PORT = 4;
@@ -33,14 +31,13 @@ public:
     {
         taskSimManager_.setReceivedFromHostCallback(fastdelegate::MakeDelegate(this, &InstrumentMaster::onHostMessage));
         taskCAN_.setSimAddress(simAddress);
+        taskCAN_.setReceiveUnknown(true);
     }
 
     virtual void setup() override
     {
         CommonInstrument::setup();
-#ifdef USE_SIMESSAGE
         taskSimManager_.start();
-#endif
     }
 
 protected:
@@ -121,7 +118,8 @@ void setup()
 {
     // skip serial without logging in favor of siminnovation interface
 #ifndef USE_SIMESSAGE
-    Serial.begin(9600);
+    Serial.begin(115200);
+    Serial.println("Debug mode");
 #endif
 
     s_instrument.setup();

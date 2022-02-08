@@ -46,9 +46,11 @@ TaskSimManager::TaskSimManager(TaskErrorLed* taskErrorLed, Scheduler& sh, byte c
 
 void TaskSimManager::start()
 {
+#ifdef USE_SIMESSAGE
     messagePort_ = new SiMessagePort(SI_MESSAGE_PORT_DEVICE_ARDUINO_NANO, static_cast<SiMessagePortChannel>(channel_),
                                      simManagerCallbackStatic);
     enable();
+#endif
 }
 
 void TaskSimManager::simManagerCallback(uint16_t message_id, struct SiMessagePortPayload* payload)
@@ -87,14 +89,19 @@ void TaskSimManager::simManagerCallbackStatic(uint16_t message_id, struct SiMess
 
 bool TaskSimManager::Callback()
 {
+#ifdef USE_SIMESSAGE
     messagePort_->Tick();
+#endif
+
     return true;
 }
 
 void TaskSimManager::sendToHost(byte port, uint16_t fromSimAddress, byte len, byte* payload)
 {
+#ifdef USE_SIMESSAGE
     SiMessagePortResult result = messagePort_->SendMessage(toSimManagerMessageId(port, fromSimAddress), payload, len);
     if (result != SI_MESSAGE_PORT_RESULT_OK && taskErrorLed_) taskErrorLed_->addError(TaskErrorLed::ERROR_HOST);
+#endif
 }
 
 void TaskSimManager::setReceivedFromHostCallback(MessageCallback callback)

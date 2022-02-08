@@ -32,7 +32,7 @@ float TaskKnob::pressure()
 
 bool TaskKnob::Callback()
 {
-    const float kThreshold = 0.005;  // 0.01 inHg
+    const float kThreshold = 0.01;  // 0.01 inHg
     float lastPressure = pressure_;
     float newPressure = pressure();
     if (fabs(lastPressure - newPressure) > kThreshold)
