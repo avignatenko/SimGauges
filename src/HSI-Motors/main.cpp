@@ -7,6 +7,7 @@
 #include <TaskEncoder.h>
 #include <TaskStepperX27Driver.h>
 
+#include <Wire.h>
 // hardware speficics
 
 const byte STEPPER_A_STEP = A0;
@@ -16,6 +17,59 @@ const byte STEPPER_B_STEP = A2;
 const byte STEPPER_B_DIR = A3;
 
 const byte STEPPER_RESET = 13;
+
+class TaskI2CSlave : private Task
+{
+public:
+    TaskI2CSlave(TaskStepperX27Driver& stepperCard, TaskStepperX27Driver& stepperBug, Scheduler* aScheduler = NULL)
+        : Task(TASK_IMMEDIATE, TASK_ONCE, aScheduler, false), stepperCard_(stepperCard), stepperBug_(stepperBug)
+    {
+        instance_ = this;
+    }
+
+    virtual bool Callback() override
+    {
+        if (Wire.available() > 0)
+        {
+        }
+    }
+
+    void start() { enable(); }
+
+protected:
+    virtual bool OnEnable() override
+    {
+        Wire.begin(1);  // Activate I2C network
+        Wire.onReceive(&TaskI2CSlave::receiveEvent);
+        return true;
+    }
+
+    virtual void OnDisable() override {}
+
+private:
+    static void receiveEvent(int howMany)
+    {
+        if (Wire.available() < sizeof(byte) + sizeof(int16_t)) return;
+
+        TaskI2CSlave* me = TaskI2CSlave::instance_;
+        byte motor = Wire.read();
+        int16_t pos = 0;
+        Wire.readBytes(reinterpret_cast<uint8_t*>(&pos), sizeof(pos));
+
+        if (motor == 0)
+            me->stepperCard_.setPosition(pos);
+        else if (motor == 1)
+            me->stepperBug_.setPosition(pos);
+    }
+
+private:
+    TaskStepperX27Driver& stepperCard_;
+    TaskStepperX27Driver& stepperBug_;
+
+    static TaskI2CSlave* instance_;
+};
+
+TaskI2CSlave* TaskI2CSlave::instance_ = nullptr;
 
 class TaskCalibrate : private Task
 {
@@ -31,16 +85,7 @@ public:
     void start() { enable(); }
 
 protected:
-    virtual bool OnEnable() override
-    {
-        pinMode(A6, INPUT);
-        // int value = analogRead(A7);
-        // Serial.println(value);
-
-        // int value2 = analogRead(A6);
-        // Serial.println(value2);
-        return true;
-    }
+    virtual bool OnEnable() override { return true; }
 
     virtual void OnDisable() override {}
 
@@ -150,7 +195,8 @@ public:
           taskStepperB_(taskManager_, STEPPER_B_STEP, STEPPER_B_DIR, STEPPER_RESET, false),
           taskEncoder1_(taskManager_, 8, 9),
           taskEncoder2_(taskManager_, 11, 12),
-          taskCalibrate_(taskStepperB_, taskStepperA_, &taskManager_)
+          taskCalibrate_(taskStepperB_, taskStepperA_, &taskManager_),
+          taskI2C_(taskStepperB_, taskStepperA_, &taskManager_)
     {
         taskStepperA_.setMaxSpeed(1000);
         taskStepperA_.setMaxAcceleration(3000);
@@ -167,13 +213,12 @@ public:
         taskStepperA_.start();
         taskStepperB_.start();
 
-        // taskStepperA_.setPosition(50000);
-        // taskStepperB_.setPosition(50000);
-
         taskEncoder1_.start();
         taskEncoder2_.start();
 
         taskCalibrate_.start();
+
+        taskI2C_.start();
 
         Serial.println("AA");
     }
@@ -197,6 +242,7 @@ private:
     TaskEncoder taskEncoder1_;
     TaskEncoder taskEncoder2_;
     TaskCalibrate taskCalibrate_;
+    TaskI2CSlave taskI2C_;
 };
 
 HSIMotors s_instrument;
