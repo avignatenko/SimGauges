@@ -27,19 +27,25 @@ public:
         instance_ = this;
     }
 
-    virtual bool Callback() override
-    {
-        if (Wire.available() > 0)
-        {
-        }
-    }
+    virtual bool Callback() override {}
 
     void start() { enable(); }
+
+    void sendEncoder(uint8_t encoder, int8_t direction, long millis)
+    {
+        Wire.beginTransmission(1);
+
+        Wire.write((uint8_t)encoder);
+        Wire.write((uint8_t)direction);
+        Wire.write(reinterpret_cast<uint8_t*>(&millis), sizeof(long));
+
+        Wire.endTransmission();
+    }
 
 protected:
     virtual bool OnEnable() override
     {
-        Wire.begin(1);  // Activate I2C network
+        Wire.begin(2);  // Activate I2C network
         Wire.onReceive(&TaskI2CSlave::receiveEvent);
         return true;
     }
@@ -145,7 +151,12 @@ private:
 
     bool finishCalibrateCard()
     {
-        if (stepperCard_.position() == stepperCard_.targetPosition()) callback_ = &TaskCalibrate::initCalibrateBug;
+        if (stepperCard_.position() == stepperCard_.targetPosition())
+        {
+            stepperCard_.resetPosition(0);
+            callback_ = &TaskCalibrate::initCalibrateBug;
+        }
+
         return true;
     }
 
@@ -177,7 +188,12 @@ private:
 
     bool finishCalibrateBug()
     {
-        disable();
+        if (stepperBug_.position() == stepperBug_.targetPosition())
+        {
+            stepperBug_.resetPosition(0);
+            disable();
+        }
+
         return true;
     }
 
@@ -191,18 +207,18 @@ class HSIMotors : public InstrumentBase
 {
 public:
     HSIMotors()
-        : taskStepperA_(taskManager_, STEPPER_A_STEP, STEPPER_A_DIR, STEPPER_RESET, false),
-          taskStepperB_(taskManager_, STEPPER_B_STEP, STEPPER_B_DIR, STEPPER_RESET, false),
+        : taskStepperBug_(taskManager_, STEPPER_A_STEP, STEPPER_A_DIR, STEPPER_RESET, false),
+          taskStepperCard_(taskManager_, STEPPER_B_STEP, STEPPER_B_DIR, STEPPER_RESET, false),
           taskEncoder1_(taskManager_, 8, 9),
           taskEncoder2_(taskManager_, 11, 12),
-          taskCalibrate_(taskStepperB_, taskStepperA_, &taskManager_),
-          taskI2C_(taskStepperB_, taskStepperA_, &taskManager_)
+          taskCalibrate_(taskStepperCard_, taskStepperBug_, &taskManager_),
+          taskI2C_(taskStepperCard_, taskStepperBug_, &taskManager_)
     {
-        taskStepperA_.setMaxSpeed(1000);
-        taskStepperA_.setMaxAcceleration(3000);
+        taskStepperBug_.setMaxSpeed(1000);
+        taskStepperBug_.setMaxAcceleration(3000);
 
-        taskStepperB_.setMaxSpeed(1000);
-        taskStepperB_.setMaxAcceleration(3000);
+        taskStepperCard_.setMaxSpeed(1000);
+        taskStepperCard_.setMaxAcceleration(3000);
 
         taskEncoder1_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &HSIMotors::onEncoder2));
         taskEncoder2_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &HSIMotors::onEncoder1));
@@ -210,8 +226,8 @@ public:
 
     void setup()
     {
-        taskStepperA_.start();
-        taskStepperB_.start();
+        taskStepperBug_.start();
+        taskStepperCard_.start();
 
         taskEncoder1_.start();
         taskEncoder2_.start();
@@ -226,19 +242,22 @@ public:
 private:
     void onEncoder1(int8_t dir, long millis)
     {
-        long accel = constrain(100 / millis, 1, 10);
-        taskStepperA_.setPosition(taskStepperA_.targetPosition() + dir * 12 * accel);
+        taskI2C_.sendEncoder(0, dir, millis);
+        // long accel = constrain(100 / millis, 1, 10);
+        // taskStepperA_.setPosition(taskStepperA_.targetPosition() + dir * 12 * accel);
     }
 
     void onEncoder2(int8_t dir, long millis)
     {
-        long accel = constrain(100 / millis, 1, 10);
-        taskStepperB_.setPosition(taskStepperB_.targetPosition() + dir * 12 * accel);
+        taskI2C_.sendEncoder(1, dir, millis);
+        // long accel = constrain(100 / millis, 1, 10);
+        // taskStepperA_.setPosition(taskStepperA_.targetPosition() - dir * 12 * accel);
+        // taskStepperB_.setPosition(taskStepperB_.targetPosition() + dir * 12 * accel);
     }
 
 private:
-    TaskStepperX27Driver taskStepperA_;
-    TaskStepperX27Driver taskStepperB_;
+    TaskStepperX27Driver taskStepperBug_;
+    TaskStepperX27Driver taskStepperCard_;
     TaskEncoder taskEncoder1_;
     TaskEncoder taskEncoder2_;
     TaskCalibrate taskCalibrate_;
