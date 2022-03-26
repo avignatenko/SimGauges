@@ -48,10 +48,11 @@ public:
         // left
         if (m_.direction2 != 0)
         {
-             setPosition(1, motorPos_[1] + m_.direction2 * 12 * accel);
-             setPosition(0, motorPos_[0] - m_.direction2 * 12 * accel);
+            float accel = constrain(100 / m_.millis2, 1, 10);
+            setPosition(1, motorPos_[1] + m_.direction2 * 12 * accel);
+            setPosition(0, motorPos_[0] - m_.direction2 * 12 * accel);
 
-            float data = m_.direction2 * constrain(100 / m_.millis2, 1, 10);
+            float data = m_.direction2 * accel;
             //taskCAN_.sendMessage(0, 0, 0, sizeof(data), reinterpret_cast<byte*>(&data));
 
             m_.direction2 = 0;
