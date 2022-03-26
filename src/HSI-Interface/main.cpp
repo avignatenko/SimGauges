@@ -36,11 +36,14 @@ public:
 
     virtual bool Callback() override
     {
+        if (!encodersCallback_) return false;
+
         // right
         if (m_.direction1 != 0)
         {
             long accel = constrain(100 / m_.millis1, 1, 10);
-            setPosition(1, motorPos_[1] + m_.direction1 * 12 * accel);
+
+            encodersCallback_(0, accel * m_.direction1);
 
             m_.direction1 = 0;
         }
@@ -49,11 +52,8 @@ public:
         if (m_.direction2 != 0)
         {
             float accel = constrain(100 / m_.millis2, 1, 10);
-            setPosition(1, motorPos_[1] + m_.direction2 * 12 * accel);
-            setPosition(0, motorPos_[0] - m_.direction2 * 12 * accel);
 
-            float data = m_.direction2 * accel;
-            //taskCAN_.sendMessage(0, 0, 0, sizeof(data), reinterpret_cast<byte*>(&data));
+            encodersCallback_(1, accel * m_.direction2);
 
             m_.direction2 = 0;
         }
@@ -75,6 +75,8 @@ public:
     int16_t position(byte motor) const { return motorPos_[motor]; }
 
     void requestUpdate() { Wire.requestFrom(2, sizeof(MotorUpdate)); }
+
+    void setEncodersCallback(fastdelegate::FastDelegate2<int8_t, float> callback) { encodersCallback_ = callback; }
 
     using Task::enable;
 
@@ -105,6 +107,8 @@ private:
     int16_t motorPos_[2] = {0};
 
     volatile MotorUpdate m_;
+
+    fastdelegate::FastDelegate2<int8_t, float> encodersCallback_;
 };
 
 TaskI2CMaster* TaskI2CMaster::instance_ = nullptr;
@@ -120,6 +124,9 @@ public:
 
         varCardCal_ = addVar("cardcal");
         varBugCal_ = addVar("bugcal");
+
+        taskI2C_.setEncodersCallback(
+            fastdelegate::FastDelegate2<int8_t, float>(this, &GenericSingleNeedleInstrument::onEncoders));
     }
 
     void setup()
@@ -174,6 +181,21 @@ private:
 
         float pos = *reinterpret_cast<float*>(payload);
         setLPos(0, pos, true);
+    }
+
+    void onEncoders(int8_t encoder, float speed)
+    {
+        if (encoder == 0)
+        {
+            taskI2C_.setPosition(1, taskI2C_.position(1) + speed * 12);
+        }
+        else
+        {
+            //taskI2C_.setPosition(1, taskI2C_.position(1) + speed * 12);
+            //taskI2C_.setPosition(0, taskI2C_.position(0) - speed * 12);
+
+            taskCAN_.sendMessage(0, 0, 0, sizeof(speed), reinterpret_cast<byte*>(&speed));
+        }
     }
 
 private:
