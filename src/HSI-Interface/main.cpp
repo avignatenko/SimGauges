@@ -15,6 +15,17 @@ const byte LED_PORT = 3;
 const byte MCP2515_SPI_PORT = 10;
 const byte MCP2515_INT_PIN = 2;
 
+struct MotorUpdate
+{
+    uint8_t calibration;  // 0 - not calibrated, 1 - in progress, 2 - calibrated
+    int16_t posCard;
+    int16_t posBug;
+    int8_t direction1;
+    long millis1;
+    int8_t direction2;
+    long millis2;
+};
+
 class TaskI2CMaster : private Task
 {
 public:
@@ -26,23 +37,24 @@ public:
     virtual bool Callback() override
     {
         // right
-        if (encoders_[0].direction != 0)
+        if (m_.direction1 != 0)
         {
-            long accel = constrain(100 / encoders_[0].millis, 1, 10);
-            setPosition(1, motorPos_[1] + encoders_[0].direction * 12 * accel);
+            long accel = constrain(100 / m_.millis1, 1, 10);
+            setPosition(1, motorPos_[1] + m_.direction1 * 12 * accel);
 
-            encoders_[0].direction = 0;
+            m_.direction1 = 0;
         }
 
         // left
-        if (encoders_[1].direction != 0)
+        if (m_.direction2 != 0)
         {
-            long accel = constrain(100 / encoders_[1].millis, 1, 10);
-            setPosition(1, motorPos_[1] + encoders_[1].direction * 12 * accel);
+             setPosition(1, motorPos_[1] + m_.direction2 * 12 * accel);
+             setPosition(0, motorPos_[0] - m_.direction2 * 12 * accel);
 
-            setPosition(0, motorPos_[0] - encoders_[1].direction * 12 * accel);
+            float data = m_.direction2 * constrain(100 / m_.millis2, 1, 10);
+            //taskCAN_.sendMessage(0, 0, 0, sizeof(data), reinterpret_cast<byte*>(&data));
 
-            encoders_[1].direction = 0;
+            m_.direction2 = 0;
         }
         return true;
     }
@@ -61,6 +73,8 @@ public:
 
     int16_t position(byte motor) const { return motorPos_[motor]; }
 
+    void requestUpdate() { Wire.requestFrom(2, sizeof(MotorUpdate)); }
+
     using Task::enable;
 
 protected:
@@ -78,31 +92,18 @@ protected:
 private:
     static void receiveEvent(int howMany)
     {
-        if (Wire.available() < sizeof(uint8_t) + sizeof(int8_t) + sizeof(long)) return;
+        if (Wire.available() < sizeof(MotorUpdate)) return;
 
         TaskI2CMaster* me = TaskI2CMaster::instance_;
 
-        uint8_t encoder = Wire.read();
-        int8_t direction = Wire.read();
-
-        long millis = 0;
-        Wire.readBytes((uint8_t*)&millis, sizeof(millis));
-
-        me->encoders_[encoder].direction = direction;
-        me->encoders_[encoder].millis = millis;
+        Wire.readBytes((uint8_t*)&me->m_, sizeof(MotorUpdate));
     }
 
 private:
     static TaskI2CMaster* instance_;
     int16_t motorPos_[2] = {0};
 
-    struct Encoder
-    {
-        int16_t direction;
-        long millis;
-    };
-
-    volatile Encoder encoders_[2] = {{0, 0}, {0, 0}};
+    volatile MotorUpdate m_;
 };
 
 TaskI2CMaster* TaskI2CMaster::instance_ = nullptr;
@@ -142,17 +143,26 @@ protected:
 
     virtual void setLPos(byte idx, float value, bool absolute) override
     {
+        value = fmod(value, 360);
+
         BasicInstrument::setLPos(idx, value, absolute);
 
         // get current angle and calculate delta
+        int16_t offset = getVar(idx == posCard_ ? varCardCal_ : varBugCal_);
+
         uint8_t curPosIdx = (idx == posCard_ ? 0 : 1);
-        float curLPos = taskI2C_.position(curPosIdx) / 12 % 360;
+        float curLPos = (taskI2C_.position(curPosIdx) - offset) / 12 % 360;
         float delta = fmod(value - curLPos + 540, 360) - 180;
         float newValue = curLPos + delta;
 
-        float offset = getVar(idx == posCard_ ? varCardCal_ : varBugCal_);
+        int16_t newPos = (int16_t)(newValue * 12 + offset);
+        taskI2C_.setPosition(curPosIdx, newPos);
 
-        taskI2C_.setPosition(curPosIdx, (int16_t)(newValue * 12 + offset));
+        if (idx == posCard_)
+        {
+            int16_t posDelta = newPos - taskI2C_.position(curPosIdx);
+            taskI2C_.setPosition(1, taskI2C_.position(1) - posDelta);
+        }
     }
 
 private:

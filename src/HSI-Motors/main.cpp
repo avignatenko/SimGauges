@@ -18,11 +18,21 @@ const byte STEPPER_B_DIR = A3;
 
 const byte STEPPER_RESET = 13;
 
+struct MotorUpdate
+{
+    uint8_t calibration;  // 0 - not calibrated, 1 - in progress, 2 - calibrated
+    int16_t posCard;
+    int16_t posBug;
+    int8_t direction1;
+    long millis1;
+    int8_t direction2;
+    long millis2;
+};
+
 class TaskI2CSlave : private Task
 {
 public:
-    TaskI2CSlave(TaskStepperX27Driver& stepperCard, TaskStepperX27Driver& stepperBug, Scheduler* aScheduler = NULL)
-        : Task(TASK_IMMEDIATE, TASK_ONCE, aScheduler, false), stepperCard_(stepperCard), stepperBug_(stepperBug)
+    TaskI2CSlave(Scheduler* aScheduler = NULL) : Task(TASK_IMMEDIATE, TASK_ONCE, aScheduler, false)
     {
         instance_ = this;
     }
@@ -31,28 +41,32 @@ public:
 
     void start() { enable(); }
 
-    void sendEncoder(uint8_t encoder, int8_t direction, long millis)
+    void sendUpdate(const MotorUpdate& update)
     {
         Wire.beginTransmission(1);
-
-        Wire.write((uint8_t)encoder);
-        Wire.write((uint8_t)direction);
-        Wire.write(reinterpret_cast<uint8_t*>(&millis), sizeof(long));
+        Wire.write(reinterpret_cast<const uint8_t*>(&update), sizeof(MotorUpdate));
 
         Wire.endTransmission();
     }
+
+    void sendStatusUpdate() {}
+
+    void setReceiveCallback(fastdelegate::FastDelegate2<int8_t, int16_t> callback) { receiveCallback_ = callback; }
 
 protected:
     virtual bool OnEnable() override
     {
         Wire.begin(2);  // Activate I2C network
         Wire.onReceive(&TaskI2CSlave::receiveEvent);
+        Wire.onRequest(&TaskI2CSlave::onRequest);
         return true;
     }
 
     virtual void OnDisable() override {}
 
 private:
+    static void onRequest() {}
+
     static void receiveEvent(int howMany)
     {
         if (Wire.available() < sizeof(byte) + sizeof(int16_t)) return;
@@ -62,15 +76,11 @@ private:
         int16_t pos = 0;
         Wire.readBytes(reinterpret_cast<uint8_t*>(&pos), sizeof(pos));
 
-        if (motor == 0)
-            me->stepperCard_.setPosition(pos);
-        else if (motor == 1)
-            me->stepperBug_.setPosition(pos);
+        if (me->receiveCallback_) me->receiveCallback_(motor, pos);
     }
 
 private:
-    TaskStepperX27Driver& stepperCard_;
-    TaskStepperX27Driver& stepperBug_;
+    fastdelegate::FastDelegate2<int8_t, int16_t> receiveCallback_;
 
     static TaskI2CSlave* instance_;
 };
@@ -89,6 +99,10 @@ public:
     virtual bool Callback() override { return (this->*callback_)(); }
 
     void start() { enable(); }
+
+    int status() { return status_; }
+
+    void setFinishPosition(int8_t motor, int16_t position) { finishPos_[motor] = position; }
 
 protected:
     virtual bool OnEnable() override { return true; }
@@ -111,6 +125,7 @@ private:
 
     bool resetToWhite()
     {
+        status_ = 1;
         // Serial.println("resetToWhite");
         int calRead = analogRead(A6);
         // Serial.println(calRead);
@@ -153,7 +168,6 @@ private:
     {
         if (stepperCard_.position() == stepperCard_.targetPosition())
         {
-            stepperCard_.resetPosition(0);
             callback_ = &TaskCalibrate::initCalibrateBug;
         }
 
@@ -190,7 +204,10 @@ private:
     {
         if (stepperBug_.position() == stepperBug_.targetPosition())
         {
-            stepperBug_.resetPosition(0);
+            stepperBug_.resetPosition(finishPos_[1]);
+            stepperCard_.resetPosition(finishPos_[0]);
+
+            status_ = 2;
             disable();
         }
 
@@ -201,6 +218,8 @@ private:
     bool (TaskCalibrate::*callback_)() = &TaskCalibrate::initResetToWhite;
     TaskStepperX27Driver& stepperCard_;
     TaskStepperX27Driver& stepperBug_;
+    int status_ = 0;
+    int16_t finishPos_[2] = {0, 0};
 };
 
 class HSIMotors : public InstrumentBase
@@ -212,8 +231,9 @@ public:
           taskEncoder1_(taskManager_, 8, 9),
           taskEncoder2_(taskManager_, 11, 12),
           taskCalibrate_(taskStepperCard_, taskStepperBug_, &taskManager_),
-          taskI2C_(taskStepperCard_, taskStepperBug_, &taskManager_)
+          taskI2C_(&taskManager_)
     {
+        taskI2C_.setReceiveCallback(fastdelegate::FastDelegate2<int8_t, int16_t>(this, &HSIMotors::onReceive));
         taskStepperBug_.setMaxSpeed(1000);
         taskStepperBug_.setMaxAcceleration(3000);
 
@@ -242,17 +262,44 @@ public:
 private:
     void onEncoder1(int8_t dir, long millis)
     {
-        taskI2C_.sendEncoder(0, dir, millis);
-        // long accel = constrain(100 / millis, 1, 10);
-        // taskStepperA_.setPosition(taskStepperA_.targetPosition() + dir * 12 * accel);
+        MotorUpdate m;
+        m.calibration = taskCalibrate_.status();
+        m.direction1 = dir;
+        m.millis1 = millis;
+        m.direction2 = 0;
+        m.millis2 = 0;
+        m.posCard = taskStepperCard_.position();
+        m.posBug = taskStepperBug_.position();
+
+        taskI2C_.sendUpdate(m);
     }
 
     void onEncoder2(int8_t dir, long millis)
     {
-        taskI2C_.sendEncoder(1, dir, millis);
-        // long accel = constrain(100 / millis, 1, 10);
-        // taskStepperA_.setPosition(taskStepperA_.targetPosition() - dir * 12 * accel);
-        // taskStepperB_.setPosition(taskStepperB_.targetPosition() + dir * 12 * accel);
+        MotorUpdate m;
+        m.calibration = taskCalibrate_.status();
+        m.direction2 = dir;
+        m.millis2 = millis;
+        m.direction1 = 0;
+        m.millis1 = 0;
+        m.posCard = taskStepperCard_.targetPosition();
+        m.posBug = taskStepperBug_.targetPosition();
+
+        taskI2C_.sendUpdate(m);
+    }
+
+    void onReceive(int8_t motor, int16_t pos)
+    {
+        if (taskCalibrate_.status() < 2)
+        {
+            taskCalibrate_.setFinishPosition(motor, pos);
+            return;
+        }
+
+        if (motor == 0)
+            taskStepperCard_.setPosition(pos);
+        else if (motor == 1)
+            taskStepperBug_.setPosition(pos);
     }
 
 private:
