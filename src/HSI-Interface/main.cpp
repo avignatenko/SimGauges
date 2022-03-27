@@ -164,11 +164,11 @@ protected:
         float newValue = curLPos + delta;
 
         int16_t newPos = (int16_t)(newValue * 12 + offset);
+        int16_t posDelta = newPos - taskI2C_.position(curPosIdx);
         taskI2C_.setPosition(curPosIdx, newPos);
 
         if (idx == posCard_)
         {
-            int16_t posDelta = newPos - taskI2C_.position(curPosIdx);
             taskI2C_.setPosition(1, taskI2C_.position(1) - posDelta);
         }
     }
