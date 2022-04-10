@@ -63,7 +63,7 @@ protected:
         BasicInstrument::setLPos(idx, value, absolute);
 
         StoredLUT& lut = getLUT(idx == 0 ? lutAIdx_ : lutBIdx_);
-        int16_t p = (int16_t)(cubicInterpolate<double, double>(lut.x(), lut.y(), lut.size(), value));
+        int16_t p = (int16_t)(catmullSplineInterpolate<double, double>(lut.x(), lut.y(), lut.size(), value));
         idxToStepper(idx).setPosition(p);
     }
 
