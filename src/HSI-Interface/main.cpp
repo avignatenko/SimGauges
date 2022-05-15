@@ -149,21 +149,36 @@ protected:
         taskI2C_.setPosition(idx == posCard_ ? 0 : 1, pos);
     }
 
-    virtual void setLPos(byte idx, float value, bool absolute) override
+    int16_t angleToSteps(float angle) { return static_cast<int16_t>(angle * 12); }
+    float stepsToAngle(int16_t steps) { return static_cast<float>(steps) / 12; }
+
+    float lPos(byte idx)
     {
-        value = fmod(value, 360);
-
-        BasicInstrument::setLPos(idx, value, absolute);
-
-        // get current angle and calculate delta
+        uint8_t curPosIdx = (idx == posCard_ ? 0 : 1);
         int16_t offset = getVar(idx == posCard_ ? varCardCal_ : varBugCal_);
 
-        uint8_t curPosIdx = (idx == posCard_ ? 0 : 1);
-        float curLPos = (taskI2C_.position(curPosIdx) - offset) / 12 % 360;
-        float delta = fmod(value - curLPos + 540, 360) - 180;
-        float newValue = curLPos + delta;
+        float curLPos = stepsToAngle(taskI2C_.position(curPosIdx) - offset);
 
-        int16_t newPos = (int16_t)(newValue * 12 + offset);
+        if (idx == posBug_)
+        {
+            float lPosCard = lPos(posCard_);
+            curLPos += lPosCard;
+        }
+        return curLPos;
+    }
+
+    void setLPosInternal(byte idx, float value)
+    {
+        if (idx == posBug_)
+        {
+            float lPosCard = lPos(posCard_);
+            value -= lPosCard;
+        }
+
+        uint8_t curPosIdx = (idx == posCard_ ? 0 : 1);
+        int16_t offset = getVar(idx == posCard_ ? varCardCal_ : varBugCal_);
+
+        int16_t newPos = angleToSteps(value) + offset;
         int16_t posDelta = newPos - taskI2C_.position(curPosIdx);
         taskI2C_.setPosition(curPosIdx, newPos);
 
@@ -173,6 +188,20 @@ protected:
         }
     }
 
+    virtual void setLPos(byte idx, float value, bool absolute) override
+    {
+        value = fmod(value, 360);
+
+        BasicInstrument::setLPos(idx, value, absolute);
+
+        // get current angle and calculate delta
+        float curLPos = lPos(idx);
+        float delta = fmod(value - curLPos + 540, 360) - 180;
+        float newValue = curLPos + delta;
+
+        setLPosInternal(idx, newValue);
+    }
+
 private:
     virtual void onCANReceived(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len,
                                byte* payload) override
@@ -180,14 +209,15 @@ private:
         if (len != 4) return;
 
         float pos = *reinterpret_cast<float*>(payload);
-        setLPos(0, pos, true);
+        setLPos(port, pos, true);
     }
 
     void onEncoders(int8_t encoder, float speed)
     {
         if (encoder == 0)
         {
-            taskI2C_.setPosition(1, taskI2C_.position(1) + speed * 12);
+            // taskI2C_.setPosition(1, taskI2C_.position(1) + speed * 12);
+            taskCAN_.sendMessage(0, 1, 0, sizeof(speed), reinterpret_cast<byte*>(&speed));
         }
         else
         {
