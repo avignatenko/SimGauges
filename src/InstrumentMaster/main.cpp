@@ -41,19 +41,6 @@ public:
     }
 
 protected:
-    virtual void onButtonPressed(bool pressed) override
-    {
-        CommonInstrument::onButtonPressed(pressed);
-
-        // debug code below!
-        if (pressed)
-        {
-            static float pos = 0;
-            pos += 10;
-            taskCAN_.sendMessage(0, 0, 16, 4, (byte*)&pos);
-        }
-    }
-
     virtual void onCANReceived(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len,
                                byte* payload) override
     {
