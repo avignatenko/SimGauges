@@ -50,7 +50,7 @@ public:
 
     void setCallback(fastdelegate::FastDelegate1<int16_t> callback) { callback_ = callback; }
 
-    int16_t value() { median_.filtered(analogRead(AP_ROLL_RESISTOR_PORT)); }
+    int16_t value() { return median_.filtered(analogRead(AP_ROLL_RESISTOR_PORT)); }
 
 private:
     bool Callback() override
@@ -58,7 +58,7 @@ private:
         if (callback_)
         {
             int newValue = value();
-            if (prevValue_ < 0 || fabs(newValue - prevValue_) > 3)
+            if (prevValue_ < 0 || abs(newValue - prevValue_) > 3)
             {
                 prevValue_ = newValue;
                 callback_(newValue);
