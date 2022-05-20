@@ -21,14 +21,16 @@ public:
         pos_[2] = addPos("c");
         pos_[3] = addPos("d");
 
-        lut_[0] = addLUT("a", 5);
-        lut_[1] = addLUT("b", 5);
-        lut_[2] = addLUT("c", 5);
-        lut_[3] = addLUT("d", 5);
+        lut_[0] = addLUT("a", 10);
+        lut_[1] = addLUT("b", 10);
+        lut_[2] = addLUT("c", 10);
+        lut_[3] = addLUT("d", 10);
     }
 
 protected:
-    virtual int32_t posForLut(byte idxLut) override { return idxLut; }
+    virtual int32_t posForLut(byte idxLut) override { return positions_[idxLut]; }
+    virtual int32_t pos(byte idxPos) override { return positions_[idxPos]; }
+
     virtual void setPos(byte idx, int32_t value, bool absolute = true) override
     {
         BasicInstrument::setPos(idx, value, absolute);
@@ -44,7 +46,7 @@ protected:
     virtual void setLPos(byte idx, float value, bool absolute = true) override
     {
         BasicInstrument::setLPos(idx, value, absolute);
-    StoredLUT& lut = getLUT(idx);
+        StoredLUT& lut = getLUT(idx);
         int32_t p = (int32_t)(catmullSplineInterpolate<double, double>(lut.x(), lut.y(), lut.size(), value));
         setPos(idx, p, absolute);
     }
@@ -53,10 +55,10 @@ private:
     virtual void onCANReceived(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len,
                                byte* payload) override
     {
-        if (port >= 4 || len != 1) return;
+        if (port >= 4 || len != 4) return;
 
-        uint8_t value = *payload;
-        setLPos(port, value);
+        float pos = *reinterpret_cast<float*>(payload);
+        setLPos(port, pos);
     }
 
 private:
