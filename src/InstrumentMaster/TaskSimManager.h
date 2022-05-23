@@ -16,11 +16,10 @@ public:
     void start();
 
     void sendToHost(byte port, uint16_t fromSimAddress, byte len, byte* payload);
+    void sendDebugMessageToHost(const String& message);
 
     using MessageCallback = fastdelegate::FastDelegate4<byte, uint16_t, byte, byte*>;
     void setReceivedFromHostCallback(MessageCallback callback);
-
-    Print* debugPrinter();
 
 protected:
     virtual bool Callback() override;
@@ -36,5 +35,4 @@ private:
     byte channel_;
     SiMessagePort* messagePort_;
     MessageCallback callback_;
-    Print* debugPrinter_ = nullptr;
 };

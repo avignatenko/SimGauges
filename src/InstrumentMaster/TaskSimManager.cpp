@@ -18,22 +18,6 @@ void fromSimManagerMessageId(uint16_t messageId, byte& out_port, uint16_t& out_t
     out_port = (messageId >> 10) & 0b11111;
 }
 
-class SimManagerDebugPrinter : public Print
-{
-public:
-    SimManagerDebugPrinter(SiMessagePort& messagePort) : messagePort_(messagePort) {}
-
-    virtual size_t write(uint8_t ch) override { return 1; }
-    virtual size_t write(const uint8_t* buffer, size_t size) override
-    {
-        messagePort_.DebugMessage(SI_MESSAGE_PORT_LOG_LEVEL_INFO, String((const char*)buffer));
-        // messagePort_.DebugMessage(SI_MESSAGE_PORT_LOG_LEVEL_INFO, "TEST");
-        return size;
-    }
-
-private:
-    SiMessagePort& messagePort_;
-};
 }  // namespace
 
 TaskSimManager* TaskSimManager::instance_ = nullptr;
@@ -104,12 +88,16 @@ void TaskSimManager::sendToHost(byte port, uint16_t fromSimAddress, byte len, by
 #endif
 }
 
+void TaskSimManager::sendDebugMessageToHost(const String& message)
+{
+#ifdef USE_SIMESSAGE
+    messagePort_->DebugMessage(SI_MESSAGE_PORT_LOG_LEVEL_DEBUG, message);
+#else
+    Serial.println(message);
+#endif
+}
+
 void TaskSimManager::setReceivedFromHostCallback(MessageCallback callback)
 {
     callback_ = callback;
-}
-
-Print* TaskSimManager::debugPrinter()
-{
-    return debugPrinter_;
 }
