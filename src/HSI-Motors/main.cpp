@@ -21,8 +21,8 @@ const byte STEPPER_RESET = 13;
 struct MotorUpdate
 {
     uint8_t calibration;  // 0 - not calibrated, 1 - in progress, 2 - calibrated
-    int16_t posCard;
-    int16_t posBug;
+    int16_t posPitch;
+    int16_t posRoll;
     int8_t direction1;
     long millis1;
     int8_t direction2;
@@ -268,8 +268,8 @@ private:
         m.millis1 = millis;
         m.direction2 = 0;
         m.millis2 = 0;
-        m.posCard = taskStepperCard_.position();
-        m.posBug = taskStepperBug_.position();
+        m.posPitch = taskStepperCard_.position();
+        m.posRoll = taskStepperBug_.position();
 
         taskI2C_.sendUpdate(m);
     }
@@ -282,8 +282,8 @@ private:
         m.millis2 = millis;
         m.direction1 = 0;
         m.millis1 = 0;
-        m.posCard = taskStepperCard_.targetPosition();
-        m.posBug = taskStepperBug_.targetPosition();
+        m.posPitch = taskStepperCard_.targetPosition();
+        m.posRoll = taskStepperBug_.targetPosition();
 
         taskI2C_.sendUpdate(m);
     }
