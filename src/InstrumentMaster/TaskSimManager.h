@@ -11,9 +11,9 @@ class TaskErrorLed;
 class TaskSimManager : private Task
 {
 public:
-    TaskSimManager(TaskErrorLed* taskErrorLed, Scheduler& sh, byte channel);
+    TaskSimManager(TaskErrorLed* taskErrorLed, Scheduler& sh);
 
-    void start();
+    void start(byte channel);
 
     void sendToHost(byte port, uint16_t fromSimAddress, byte len, byte* payload);
     void sendDebugMessageToHost(const String& message);
@@ -32,7 +32,6 @@ private:
     static TaskSimManager* instance_;
 
     TaskErrorLed* taskErrorLed_;
-    byte channel_;
     SiMessagePort* messagePort_;
     MessageCallback callback_;
 };

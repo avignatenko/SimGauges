@@ -8,18 +8,24 @@
 #include <TaskErrorLed.h>
 #include "TaskSimManager.h"
 
+#include <EEPROM.h>
 #include <map>
+
 // hardware speficics
 const int BUTTON_PORT = 7;
 const int LED_PORT = 4;
 const int MCP2515_SPI_PORT = 10;
 const int MCP2515_INT_PIN = 2;
 
-// todo: read from flash?
-const int kSimManagerChannel = 15;  // channel P
+#define WRITE_EEPROM 0
 
-// todo: read from flash?
-const uint16_t kSimAddress = 1;  // master 1
+#if WRITE_EEPROM
+const int kSimManagerChannel = 15;  // channel P
+const uint16_t kSimAddress = 1;     // master 1
+#endif
+
+const int8_t kSimAddressEEPROMAddress = 0;
+const int8_t kSimManagerChannelEEPROMAddress = 2;
 
 class StatsTask : public Task
 {
@@ -67,15 +73,20 @@ private:
 class InstrumentMaster : public CommonInstrument
 {
 public:
-    InstrumentMaster(byte ledPin, byte buttonPin, byte canSPIPin, byte canIntPin, byte simManagerChannel,
-                     byte simAddress)
+    InstrumentMaster(byte ledPin, byte buttonPin, byte canSPIPin, byte canIntPin)
         : CommonInstrument(ledPin, buttonPin, canSPIPin, canIntPin),
-          taskSimManager_(&taskErrorLed_, taskManager_, simManagerChannel),
-          simAddress_(simAddress),
+          taskSimManager_(&taskErrorLed_, taskManager_),
           stats_(taskManager_, taskSimManager_)
     {
+#if WRITE_EEPROM
+        EEPROM.put(kSimAddressEEPROMAddress, kSimAddress);
+        EEPROM.put(kSimManagerChannelEEPROMAddress, kSimManagerChannel);
+#endif
+
+        EEPROM.get(kSimAddressEEPROMAddress, simAddress_);
+
         taskSimManager_.setReceivedFromHostCallback(fastdelegate::MakeDelegate(this, &InstrumentMaster::onHostMessage));
-        taskCAN_.setSimAddress(simAddress);
+        taskCAN_.setSimAddress(simAddress_);
         taskCAN_.setReceiveUnknown(true);
         taskCAN_.setErrorCAllback(fastdelegate::MakeDelegate(this, &InstrumentMaster::onCANError));
     }
@@ -83,7 +94,18 @@ public:
     virtual void setup() override
     {
         CommonInstrument::setup();
-        taskSimManager_.start();
+
+        uint8_t channel = 0;
+        EEPROM.get(kSimManagerChannelEEPROMAddress, channel);
+
+#ifndef USE_SIMESSAGE
+        Serial.println("Sim channel:");
+        Serial.println(channel);
+        Serial.println("CANSim addr:");
+        Serial.println(simAddress_);
+
+#endif
+        taskSimManager_.start(channel);
     }
 
 protected:
@@ -141,13 +163,12 @@ private:
 
 private:
     TaskSimManager taskSimManager_;
-    const byte simAddress_;
+    uint16_t simAddress_;
 
     StatsTask stats_;
 };
 
-InstrumentMaster s_instrument(LED_PORT, BUTTON_PORT, MCP2515_SPI_PORT, MCP2515_INT_PIN, kSimManagerChannel,
-                              kSimAddress);
+InstrumentMaster s_instrument(LED_PORT, BUTTON_PORT, MCP2515_SPI_PORT, MCP2515_INT_PIN);
 
 void setup()
 {

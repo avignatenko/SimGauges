@@ -22,16 +22,16 @@ void fromSimManagerMessageId(uint16_t messageId, byte& out_port, uint16_t& out_t
 
 TaskSimManager* TaskSimManager::instance_ = nullptr;
 
-TaskSimManager::TaskSimManager(TaskErrorLed* taskErrorLed, Scheduler& sh, byte channel)
-    : Task(TASK_IMMEDIATE, TASK_FOREVER, &sh, true), taskErrorLed_(taskErrorLed), channel_(channel)
+TaskSimManager::TaskSimManager(TaskErrorLed* taskErrorLed, Scheduler& sh)
+    : Task(TASK_IMMEDIATE, TASK_FOREVER, &sh, true), taskErrorLed_(taskErrorLed)
 {
     instance_ = this;
 }
 
-void TaskSimManager::start()
+void TaskSimManager::start(byte channel)
 {
 #ifdef USE_SIMESSAGE
-    messagePort_ = new SiMessagePort(SI_MESSAGE_PORT_DEVICE_ARDUINO_NANO, static_cast<SiMessagePortChannel>(channel_),
+    messagePort_ = new SiMessagePort(SI_MESSAGE_PORT_DEVICE_ARDUINO_NANO, static_cast<SiMessagePortChannel>(channel),
                                      simManagerCallbackStatic);
     enable();
 #endif
