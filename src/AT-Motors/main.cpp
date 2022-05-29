@@ -187,34 +187,79 @@ private:
         // Serial.println("resetToWhite");
         int calRead = analogRead(A6);
         // Serial.println(calRead);
-        if (calRead > 300)
+        if (calRead > 400)
         {
             stepperRoll_.stop();
-            callback_ = &TaskCalibrate::initCalibrateRoll;
+            callback_ = &TaskCalibrate::initCalibrateRollFast;
         }
 
         return true;
     }
 
-    bool initCalibrateRoll()
+    bool initCalibrateRollFast()
     {
-        Serial.println("initCalibrateRoll");
+        Serial.println("initCalibrateRollFast");
         stepperRoll_.resetPosition(0);
         stepperRoll_.setPosition(angleToSteps(-400));
 
-        callback_ = &TaskCalibrate::calibrateRoll;
+        callback_ = &TaskCalibrate::calibrateRollFast;
 
         return true;
     }
 
-    bool calibrateRoll()
+    bool calibrateRollFast()
     {
         // Serial.println("calibrateCard");
         int calRead = analogRead(A6);
         // Serial.println(calRead);
         if (calRead < 80)
         {
-            Serial.println("calibrateRoll found pos");
+            Serial.println("calibrateRollFast found pos");
+            Serial.println(stepperRoll_.position());
+
+            callback_ = &TaskCalibrate::calibrateTransitionInit;
+        }
+        return true;
+    }
+
+    bool calibrateTransitionInit()
+    {
+        Serial.println("calibrateTransitionInit");
+        stepperRoll_.setPosition(stepperRoll_.position() + angleToSteps(20));
+        callback_ = &TaskCalibrate::calibrateTransition;
+    }
+
+    bool calibrateTransition()
+    {
+        if (!stepperRoll_.isRunning())
+        {
+            callback_ = &TaskCalibrate::initCalibrateRollSlow;
+        }
+        return true;
+    }
+
+    bool initCalibrateRollSlow()
+    {
+        savedSpeed_ = stepperRoll_.speed();
+        stepperRoll_.setSpeed(200);
+
+        Serial.println("initCalibrateRollSlow");
+        stepperRoll_.resetPosition(0);
+        stepperRoll_.setPosition(angleToSteps(-400));
+
+        callback_ = &TaskCalibrate::calibrateRollSlow;
+
+        return true;
+    }
+
+    bool calibrateRollSlow()
+    {
+        // Serial.println("calibrateCard");
+        int calRead = analogRead(A6);
+        // Serial.println(calRead);
+        if (calRead < 80)
+        {
+            Serial.println("calibrateRollSlow found pos");
             Serial.println(stepperRoll_.position());
             stepperRoll_.resetPosition(0);
             stepperRoll_.setPosition(finishPos_);
@@ -225,6 +270,9 @@ private:
 
     bool finishCalibrateRoll()
     {
+        Serial.println("finishCalibrateRoll");
+        stepperRoll_.setSpeed(savedSpeed_);
+
         if (!stepperRoll_.isRunning())
         {
             status_ = 2;
@@ -239,6 +287,7 @@ private:
     TaskStepperTMC2208& stepperRoll_;
     int status_ = 0;
     int16_t finishPos_ = 0;
+    float savedSpeed_ = 0.0f;
 };
 
 class ATMotors : public InstrumentBase
@@ -253,11 +302,11 @@ public:
     {
         taskI2C_.setReceiveCallback(fastdelegate::FastDelegate2<int8_t, int16_t>(this, &ATMotors::onReceive));
 
-        taskStepperRoll_.setSpeed(3000);
-        taskStepperRoll_.setAcceleration(8000);
+        taskStepperRoll_.setSpeed(4000);
+        taskStepperRoll_.setAcceleration(6000);
 
-        //   taskStepperCard_.setMaxSpeed(1000);
-        //   taskStepperCard_.setMaxAcceleration(3000);
+        taskStepperCard_.setSpeed(3000);
+        taskStepperCard_.setAcceleration(5000);
     }
 
     void setup()
@@ -269,13 +318,6 @@ public:
         taskCalibratePitch_.start();
 
         taskI2C_.start();
-
-        // Serial.println("AA");
-
-        // taskStepperCard_.setPosition(-5000);
-        //  taskStepperCard_.setPosition(1000);
-
-        // Serial.println("AA");
     }
 
 private:
