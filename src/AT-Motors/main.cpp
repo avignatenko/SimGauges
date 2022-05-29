@@ -33,7 +33,7 @@ public:
         instance_ = this;
     }
 
-    virtual bool Callback() override {}
+    virtual bool Callback() override { return false; }
 
     void start() { enable(); }
 
@@ -158,11 +158,24 @@ protected:
     virtual void OnDisable() override {}
 
 private:
+    static constexpr float kStepAngle = 0.9;
+    static constexpr int kMicroSteps = 16;
+    static constexpr float kGearRatio = 18.0 / 10.0;
+
+    static int32_t angleToSteps(float angle)
+    {
+        return static_cast<int32_t>(angle * kMicroSteps / kStepAngle * kGearRatio);
+    }
+    static float stepsToAngle(int16_t steps)
+    {
+        return static_cast<float>(steps) / kMicroSteps * kStepAngle / kGearRatio;
+    }
+
     bool initResetToBlack()
     {
         Serial.println("initResetToBlack");
         stepperRoll_.resetPosition(0);
-        stepperRoll_.setPosition(400 * 16 / 0.9 * 18 / 10);
+        stepperRoll_.setPosition(angleToSteps(400));
 
         callback_ = &TaskCalibrate::resetToBlack;
         return true;
@@ -187,7 +200,7 @@ private:
     {
         Serial.println("initCalibrateRoll");
         stepperRoll_.resetPosition(0);
-        stepperRoll_.setPosition(-400 * 16 / 0.9 * 18 / 10);
+        stepperRoll_.setPosition(angleToSteps(-400));
 
         callback_ = &TaskCalibrate::calibrateRoll;
 

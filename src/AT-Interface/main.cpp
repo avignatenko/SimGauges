@@ -87,7 +87,8 @@ public:
         posPitch_ = addPos("pitch");
         posRoll_ = addPos("roll");
 
-        varPitchCal_ = addVar("pitchcal");
+        pitchLUT_ = addLUT("pitch", 10);
+
         varRollCal_ = addVar("rollcal");
     }
 
@@ -98,14 +99,7 @@ public:
     }
 
 protected:
-    virtual void onButtonPressed(bool pressed, byte port)
-    {
-        Serial.println("A");
-        taskI2C_.setPosition(0, taskI2C_.position(0) + 100);
-    }
-    virtual void setVar(byte idx, float value) override { BasicInstrument::setVar(idx, value); }
-
-    virtual int32_t posForLut(byte idxLut) override { return taskI2C_.position(idxLut); }
+    virtual int32_t posForLut(byte idxLut) override { return taskI2C_.position(idxLut == pitchLUT_ ? posPitch_ : 0); }
     virtual int32_t pos(byte idxPos) override { return taskI2C_.position(idxPos == posPitch_ ? 0 : 1); }
 
     virtual void setPos(byte idx, int32_t value, bool absolute) override
@@ -116,46 +110,57 @@ protected:
         taskI2C_.setPosition(idx == posPitch_ ? 0 : 1, pos);
     }
 
-    int16_t angleToSteps(float angle) { return static_cast<int16_t>(angle * 16 / 0.9 * 18 / 10); }
-    float stepsToAngle(int16_t steps) { return static_cast<float>(steps) / 16 * 0.9 * 10 / 18; }
+    static constexpr float kStepAngleRoll = 0.9;
+    static constexpr int kMicroStepsRoll = 16;
+    static constexpr float kGearRatioRoll = 18.0 / 10.0;
 
-    float lPos(byte idx)
+    static int32_t angleToStepsRoll(float angle)
     {
-        uint8_t curPosIdx = (idx == posPitch_ ? 0 : 1);
-        int16_t offset = getVar(idx == posPitch_ ? varPitchCal_ : varRollCal_);
+        return static_cast<int32_t>(angle * kMicroStepsRoll / kStepAngleRoll * kGearRatioRoll);
+    }
+    static float stepsToAngleRoll(int16_t steps)
+    {
+        return static_cast<float>(steps) / kMicroStepsRoll * kStepAngleRoll / kGearRatioRoll;
+    }
 
-        float curLPos = stepsToAngle(taskI2C_.position(curPosIdx) - offset);
-
-        if (idx == posRoll_)
-        {
-            float lPosCard = lPos(posPitch_);
-            curLPos += lPosCard;
-        }
+    float lPosRoll()
+    {
+        uint8_t curPosIdx = 1;
+        int16_t offset = getVar(varRollCal_);
+        float curLPos = stepsToAngleRoll(taskI2C_.position(curPosIdx) - offset);
         return curLPos;
     }
 
-    void setLPosInternal(byte idx, float value)
+    void setLPosRollInternal(float value)
     {
-        uint8_t curPosIdx = (idx == posPitch_ ? 0 : 1);
-        int16_t offset = getVar(idx == posPitch_ ? varPitchCal_ : varRollCal_);
+        uint8_t curPosIdx = 1;
+        int16_t offset = getVar(varRollCal_);
 
-        int16_t newPos = angleToSteps(value) + offset;
-        int16_t posDelta = newPos - taskI2C_.position(curPosIdx);
+        int16_t newPos = angleToStepsRoll(value) + offset;
         taskI2C_.setPosition(curPosIdx, newPos);
     }
 
     virtual void setLPos(byte idx, float value, bool absolute) override
     {
-        value = fmod(value, 360);
-
         BasicInstrument::setLPos(idx, value, absolute);
 
-        // get current angle and calculate delta
-        float curLPos = lPos(idx);
-        float delta = fmod(value - curLPos + 540, 360) - 180;
-        float newValue = curLPos + delta;
+        value = fmod(value, 360);
 
-        setLPosInternal(idx, newValue);
+        if (idx == posRoll_)
+        {
+            // get current angle and calculate delta (minimum distance)
+            float curLPos = lPosRoll();
+            float delta = fmod(value - curLPos + 540, 360) - 180;
+            float newValue = curLPos + delta;
+
+            setLPosRollInternal(newValue);
+        }
+        else if (idx == posPitch_)
+        {
+            StoredLUT& lut = getLUT(pitchLUT_);
+            int16_t p = (int16_t)(catmullSplineInterpolate<double, double>(lut.x(), lut.y(), lut.size(), value));
+            taskI2C_.setPosition(0, p);
+        }
     }
 
 private:
@@ -172,8 +177,8 @@ private:
     TaskI2CMaster taskI2C_;
     byte posPitch_;
     byte posRoll_;
+    byte pitchLUT_;
 
-    byte varPitchCal_;
     byte varRollCal_;
 };
 
