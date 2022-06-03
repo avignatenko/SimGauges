@@ -109,6 +109,17 @@ public:
     }
 
 protected:
+    virtual void onButtonPressed(bool pressed, byte port)
+    {
+        CommonInstrument::onButtonPressed(pressed, port);
+        float payload = (pressed ? 60 : 0);
+        taskCAN_.sendMessage(0, 0, 16, 4, (byte*)&payload);
+
+#ifndef USE_SIMESSAGE
+        Serial.println("DBG message sent");
+#endif
+    }
+
     virtual void onCANReceived(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len,
                                byte* payload) override
     {
