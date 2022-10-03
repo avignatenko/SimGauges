@@ -27,7 +27,7 @@ int32_t TaskKnob::knobValue()
 
 float TaskKnob::pressure()
 {
-    return cubicInterpolate<double, double>(lut_->x(), lut_->y(), lut_->size(), knobValue());
+    return catmullSplineInterpolate<double, double>(lut_->x(), lut_->y(), lut_->size(), knobValue());
 }
 
 bool TaskKnob::Callback()
@@ -41,6 +41,11 @@ bool TaskKnob::Callback()
         if (pressureCallback_) pressureCallback_(newPressure);
     }
     return true;
+}
+
+void TaskKnob::forceUpdate()
+{
+     if (pressureCallback_) pressureCallback_(pressure());
 }
 
 void TaskKnob::start()

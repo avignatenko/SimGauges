@@ -31,10 +31,14 @@ public:
     {
         varCal0Idx_ = addVar("cal0");
         taskCalibrate_.setCalibration(getVar(varCal0Idx_));
+        taskCalibrate_.setFinishedCallback(fastdelegate::MakeDelegate(this, &Altimeter::onCalibrationFinished));
 
         lutKIdx_ = addLUT("k", 10);
         taskKnob_.setLUT(&getLUT(lutKIdx_));
         taskKnob_.setPressureCallback(fastdelegate::MakeDelegate(this, &Altimeter::onPressureKnobChanged));
+
+        posMotorIdx_ = addPos("mot");
+        posKnobIdx_ = addPos("knob");
     }
 
     void setup()
@@ -42,7 +46,6 @@ public:
         BasicInstrument::setup();
         taskStepper_.start();
         taskCalibrate_.start();
-        taskKnob_.start();
     }
 
 protected:
@@ -54,21 +57,28 @@ protected:
     }
 
     virtual int32_t posForLut(byte idx) override { return taskKnob_.knobValue(); }
-    virtual int32_t pos(byte idx) override { return taskKnob_.knobValue(); }
+    virtual int32_t pos(byte idx) override { return idx == posMotorIdx_ ? taskStepper_.position() : taskKnob_.knobValue(); }
 
     virtual void setPos(byte idx, int32_t value, bool absolute) override
     {
         BasicInstrument::setPos(idx, value, absolute);
+
+        if (idx != posMotorIdx_) return; // can't set value for knob
 
         int32_t pos = (absolute ? value : taskStepper_.position() + value);
         taskStepper_.setPosition(pos);
     }
 
 private:
+    void onCalibrationFinished()
+    {
+        taskKnob_.start();
+    }
+
     void onPressureKnobChanged(float pressure)
     {
-        Serial.print("pr: ");
-        Serial.println(pressure);
+        //Serial.print("pr: ");
+        //Serial.println(pressure);
         taskCAN_.sendMessage(0, 0, 0, sizeof(float), reinterpret_cast<byte*>(&pressure));
     }
 
@@ -84,6 +94,11 @@ private:
             int32_t pos = h * 16 * 200 / 1000;
             taskStepper_.setPosition(pos);
         }
+
+        if (port == 1)
+        {
+            taskKnob_.forceUpdate();
+        }
     }
 
 private:
@@ -93,6 +108,9 @@ private:
 
     byte varCal0Idx_ = 0;
     byte lutKIdx_ = 0;
+
+    byte posMotorIdx_ = 0;
+    byte posKnobIdx_ = 0;
 };
 
 Altimeter s_instrument(LED_PORT, BUTTON_PORT, MCP2515_SPI_PORT, MCP2515_INT_PIN);

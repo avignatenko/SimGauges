@@ -18,6 +18,7 @@ public:
 
     void start();
 
+    void forceUpdate();
 private:
     virtual bool Callback() override;
     Task& task();
