@@ -12,6 +12,21 @@
 
 const uint8_t AP_SELECTOR_PORTS_NUM = 5;
 const uint8_t AP_SELECTOR_PORTS[AP_SELECTOR_PORTS_NUM] = {2, 3, 4, 5, 6};
+const uint8_t ENC_1_CW_PORT = 4;
+const uint8_t ENC_1_CCW_PORT = 3;
+
+const uint8_t ENC_2_CW_PORT = A3;
+const uint8_t ENC_2_CCW_PORT = A2;
+
+const uint8_t ENC_3_CW_PORT = A1;
+const uint8_t ENC_3_CCW_PORT = A0;
+
+const uint8_t ENC_4_CW_PORT = 5;
+const uint8_t ENC_4_CCW_PORT = 6;
+
+const uint8_t DIGITS_DATA_PIN = 9;
+const uint8_t DIGITS_CLK_PIN = 7;
+const uint8_t DIGITS_CS_PIN = 8;
 
 class SelectorTask : private Task
 {
@@ -47,7 +62,7 @@ private:
     {
         if (apSelectorCallback_)
         {
-            for (int i = 0; i < 6; ++i)
+            for (int i = 0; i < AP_SELECTOR_PORTS_NUM; ++i)
             {
                 apSelector_[i].update();
                 if (apSelector_[i].pressed())
@@ -57,10 +72,10 @@ private:
                 }
             }
 
-            //if (apSelector_[0].released() && selectorValue() == 0)
-            //    apSelectorCallback_(0);
+            // if (apSelector_[0].released() && selectorValue() == 0)
+            //     apSelectorCallback_(0);
         }
-     
+
         return true;
     }
 
@@ -76,7 +91,7 @@ public:
     virtual bool Callback() override { return false; }
     void start()
     {
-        lc_.begin(9, 7, 8);
+        lc_.begin(DIGITS_DATA_PIN, DIGITS_CLK_PIN, DIGITS_CS_PIN);
         /*
          The MAX72XX is in power-saving mode on startup,
          we have to do a wakeup call
@@ -93,16 +108,19 @@ public:
     void setDigit(uint8_t idx, uint8_t value)
     {
         digits_[idx] = value;
-        if (isEnabled()) lc_.setDigit(0, digitsIdxMap_[idx], value, false);
+        if (on_) lc_.setDigit(0, idx, value, false);
     }
+
+    uint8_t digit(uint8_t idx) { return digits_[idx]; }
 
     void setOn()
     {
         on_ = true;
-        setDigit(digitsIdxMap_[0], digits_[0]);
-        setDigit(digitsIdxMap_[1], digits_[1]);
-        setDigit(digitsIdxMap_[2], digits_[2]);
-        setDigit(digitsIdxMap_[3], digits_[3]);
+
+        setDigit(0, digits_[0]);
+        setDigit(1, digits_[1]);
+        setDigit(2, digits_[2]);
+        setDigit(3, digits_[3]);
     }
 
     void setOff()
@@ -119,7 +137,6 @@ protected:
 private:
     LedControl_SW_SPI lc_;
     uint8_t digits_[4] = {0, 0, 0, 0};
-    uint8_t digitsIdxMap_[4] = {3, 2, 1, 0};
     bool on_ = false;
 };
 
@@ -186,25 +203,39 @@ class ATMotors : public InstrumentBase
 {
 public:
     ATMotors()
-        : taskI2C_(&taskManager_),
+        :  // taskI2C_(&taskManager_),
           taskDigits_(&taskManager_),
-          taskButton_(taskManager_, 11),
-          taskSelector_(taskManager_)
+          // taskButton_(taskManager_, 11),
+          // taskSelector_(taskManager_),
+          taskEncoder1_(taskManager_, ENC_1_CW_PORT, ENC_1_CCW_PORT),
+          taskEncoder2_(taskManager_, ENC_2_CW_PORT, ENC_2_CCW_PORT),
+          taskEncoder3_(taskManager_, ENC_3_CW_PORT, ENC_3_CCW_PORT),
+          taskEncoder4_(taskManager_, ENC_4_CW_PORT, ENC_4_CCW_PORT)
     {
-        taskI2C_.setReceiveCallback(fastdelegate::FastDelegate2<int8_t, int16_t>(this, &ATMotors::onReceive));
-        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, byte>(this, &ATMotors::onButtonPressed));
-        taskSelector_.setSelectorCallback(fastdelegate::FastDelegate1<int8_t>(this, &ATMotors::onSelectorSwitched));
-        analogWrite(10, 255);
+        //  taskI2C_.setReceiveCallback(fastdelegate::FastDelegate2<int8_t, int16_t>(this, &ATMotors::onReceive));
+        //  taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, byte>(this, &ATMotors::onButtonPressed));
+        //  taskSelector_.setSelectorCallback(fastdelegate::FastDelegate1<int8_t>(this, &ATMotors::onSelectorSwitched));
+        taskEncoder1_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &ATMotors::onEncoder1));
+        taskEncoder2_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &ATMotors::onEncoder2));
+        taskEncoder3_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &ATMotors::onEncoder3));
+        taskEncoder4_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &ATMotors::onEncoder4));
+        // analogWrite(10, 100);
     }
 
     void setup()
     {
-        taskI2C_.start();
+        // taskI2C_.start();
         taskDigits_.start();
         taskDigits_.setOn();  // temp
 
-        taskButton_.start();
-        taskSelector_.start();
+        // taskButton_.start();
+        // taskSelector_.start();
+
+        // Serial.print("enc start");
+        taskEncoder1_.start();
+        taskEncoder2_.start();
+        taskEncoder3_.start();
+        taskEncoder4_.start();
     }
 
 private:
@@ -212,11 +243,37 @@ private:
     void onButtonPressed(bool pressed, byte btn) { Serial.println("AA"); }
     void onSelectorSwitched(int8_t idx) { Serial.println(idx); }
 
+    uint8_t increment(uint8_t digit, int8_t dir)
+    {
+        int8_t newDigit = (int8_t)digit + dir;
+        return ((uint8_t)newDigit) % 8; 
+    }
+    void onEncoder1(int8_t dir, long)
+    {
+        taskDigits_.setDigit(0, increment(taskDigits_.digit(0), dir));
+    }
+    void onEncoder2(int8_t dir, long)
+    {
+        taskDigits_.setDigit(1, increment(taskDigits_.digit(1), dir));
+    }
+    void onEncoder3(int8_t dir, long)
+    {
+        taskDigits_.setDigit(3, increment(taskDigits_.digit(3), dir));
+    }
+    void onEncoder4(int8_t dir, long)
+    {
+        taskDigits_.setDigit(2, increment(taskDigits_.digit(2), dir));
+    }
+
 private:
-    TaskI2CSlave taskI2C_;
+    // TaskI2CSlave taskI2C_;
     Digits taskDigits_;
-    TaskButton taskButton_;
-    SelectorTask taskSelector_;
+    // TaskButton taskButton_;
+    // SelectorTask taskSelector_;
+    TaskEncoder taskEncoder1_;
+    TaskEncoder taskEncoder2_;
+    TaskEncoder taskEncoder3_;
+    TaskEncoder taskEncoder4_;
 };
 
 ATMotors s_instrument;
