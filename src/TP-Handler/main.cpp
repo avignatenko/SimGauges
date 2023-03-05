@@ -7,7 +7,7 @@
 
 #include <Adafruit_MCP23X17.h>
 #include <LedControl_SW_SPI.h>
-#include <TaskButtonMCP23017.h>
+#include <TaskButton.h>
 #include <TaskEncoder.h>
 
 //  hardware speficics
@@ -154,7 +154,7 @@ class TPHandler : public CommonInstrument
 {
 public:
     TPHandler()
-        : CommonInstrument(A6, A7, MCP2515_SPI_PORT, MCP2515_INT_PIN),
+        : CommonInstrument(new TaskErrorLedMCP23017(taskManager_, mcp, 8), A7, MCP2515_SPI_PORT, MCP2515_INT_PIN),
           taskDigits_(&taskManager_),
           taskButton_(taskManager_, mcp, 6),
           taskSelector_(taskManager_),
@@ -173,9 +173,7 @@ public:
 
     void setup()
     {
-        CommonInstrument::setup();
-        
-        // init MCP first
+         // init MCP first
         if (!mcp.begin_I2C())
         {
             Serial.println("I2C Error.");
@@ -183,10 +181,14 @@ public:
 
         // configure LED pins for output
         mcp.pinMode(5, OUTPUT);
-        mcp.digitalWrite(5, LOW);
+        mcp.digitalWrite(5, HIGH);
 
-        mcp.pinMode(8, OUTPUT);
-        mcp.digitalWrite(8, LOW);
+        //mcp.pinMode(8, OUTPUT);
+        //mcp.digitalWrite(8, LOW);
+
+        CommonInstrument::setup();
+
+       
 
         taskDigits_.start();
         taskDigits_.setOn();  // temp
