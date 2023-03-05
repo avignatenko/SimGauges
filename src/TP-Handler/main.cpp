@@ -30,6 +30,9 @@ const uint8_t DIGITS_DATA_PIN = 9;
 const uint8_t DIGITS_CLK_PIN = 7;
 const uint8_t DIGITS_CS_PIN = 8;
 
+const byte MCP2515_SPI_PORT = 10;
+const byte MCP2515_INT_PIN = 2;
+
 Adafruit_MCP23X17 mcp;
 
 class SelectorTask : private Task
@@ -147,11 +150,12 @@ private:
     bool on_ = false;
 };
 
-class ATMotors : public InstrumentBase
+class TPHandler : public CommonInstrument
 {
 public:
-    ATMotors()
-        : taskDigits_(&taskManager_),
+    TPHandler()
+        : CommonInstrument(A6, A7, MCP2515_SPI_PORT, MCP2515_INT_PIN),
+          taskDigits_(&taskManager_),
           taskButton_(taskManager_, mcp, 6),
           taskSelector_(taskManager_),
           taskEncoder1_(taskManager_, ENC_1_CW_PORT, ENC_1_CCW_PORT),
@@ -159,16 +163,18 @@ public:
           taskEncoder3_(taskManager_, ENC_3_CW_PORT, ENC_3_CCW_PORT),
           taskEncoder4_(taskManager_, ENC_4_CW_PORT, ENC_4_CCW_PORT)
     {
-        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, byte>(this, &ATMotors::onButtonPressed));
-        taskSelector_.setSelectorCallback(fastdelegate::FastDelegate1<int8_t>(this, &ATMotors::onSelectorSwitched));
-        taskEncoder1_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &ATMotors::onEncoder1));
-        taskEncoder2_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &ATMotors::onEncoder2));
-        taskEncoder3_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &ATMotors::onEncoder3));
-        taskEncoder4_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &ATMotors::onEncoder4));
+        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, byte>(this, &TPHandler::onButtonPressed));
+        taskSelector_.setSelectorCallback(fastdelegate::FastDelegate1<int8_t>(this, &TPHandler::onSelectorSwitched));
+        taskEncoder1_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder1));
+        taskEncoder2_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder2));
+        taskEncoder3_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder3));
+        taskEncoder4_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder4));
     }
 
     void setup()
     {
+        CommonInstrument::setup();
+        
         // init MCP first
         if (!mcp.begin_I2C())
         {
@@ -219,7 +225,7 @@ private:
     TaskEncoder taskEncoder4_;
 };
 
-ATMotors s_instrument;
+TPHandler s_instrument;
 
 void setup()
 {
