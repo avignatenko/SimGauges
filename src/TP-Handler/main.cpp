@@ -38,7 +38,7 @@ Adafruit_MCP23X17 mcp;
 class SelectorTask : private Task
 {
 public:
-    SelectorTask(Scheduler& sh) : Task(20 * TASK_MILLISECOND, TASK_FOREVER, &sh, true) {}
+    SelectorTask(Scheduler& sh) : Task(20 * TASK_MILLISECOND, TASK_FOREVER, &sh, false) {}
 
     void setSelectorCallback(fastdelegate::FastDelegate1<int8_t> callback) { apSelectorCallback_ = callback; }
 
@@ -154,7 +154,7 @@ class TPHandler : public CommonInstrument
 {
 public:
     TPHandler()
-        : CommonInstrument(new TaskErrorLedMCP23017(taskManager_, mcp, 8), A7, MCP2515_SPI_PORT, MCP2515_INT_PIN),
+        : CommonInstrument(MCP2515_SPI_PORT, MCP2515_INT_PIN),
           taskDigits_(&taskManager_),
           taskButton_(taskManager_, mcp, 6),
           taskSelector_(taskManager_),
@@ -163,7 +163,10 @@ public:
           taskEncoder3_(taskManager_, ENC_3_CW_PORT, ENC_3_CCW_PORT),
           taskEncoder4_(taskManager_, ENC_4_CW_PORT, ENC_4_CCW_PORT)
     {
-        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, byte>(this, &TPHandler::onButtonPressed));
+        setTaskErrorLed(new TaskErrorLedMCP23017(taskManager_, mcp, 8));
+        setTaskButton(new TaskButtonMCP23017(taskManager_, mcp, 7));
+
+        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, byte>(this, &TPHandler::onXPDRButtonPressed));
         taskSelector_.setSelectorCallback(fastdelegate::FastDelegate1<int8_t>(this, &TPHandler::onSelectorSwitched));
         taskEncoder1_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder1));
         taskEncoder2_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder2));
@@ -171,9 +174,9 @@ public:
         taskEncoder4_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder4));
     }
 
-    void setup()
+    virtual void setup() override
     {
-         // init MCP first
+        // init MCP first
         if (!mcp.begin_I2C())
         {
             Serial.println("I2C Error.");
@@ -183,12 +186,10 @@ public:
         mcp.pinMode(5, OUTPUT);
         mcp.digitalWrite(5, HIGH);
 
-        //mcp.pinMode(8, OUTPUT);
-        //mcp.digitalWrite(8, LOW);
+        // mcp.pinMode(8, OUTPUT);
+        // mcp.digitalWrite(8, LOW);
 
         CommonInstrument::setup();
-
-       
 
         taskDigits_.start();
         taskDigits_.setOn();  // temp
@@ -204,7 +205,7 @@ public:
 
 private:
     void onReceive(int8_t motor, int16_t pos) {}
-    void onButtonPressed(bool pressed, byte btn) { Serial.println("AA"); }
+    void onXPDRButtonPressed(bool pressed, byte btn) { Serial.println("AA"); }
     void onSelectorSwitched(int8_t idx) { Serial.println(idx); }
 
     uint8_t increment(uint8_t digit, int8_t dir)
