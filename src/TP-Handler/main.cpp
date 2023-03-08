@@ -5,18 +5,17 @@
 
 #include <BasicInstrument.h>
 
-#include <Adafruit_MCP23X17.h>
 #include <LedControl_SW_SPI.h>
+#include <MCP23017.h>
 #include <TaskButton.h>
 #include <TaskEncoder.h>
 
 //  hardware speficics
-
-Adafruit_MCP23X17 mcp;
+MCP23017 mcp(0x20);
 
 const uint8_t AP_SELECTOR_PORTS_NUM = 5;
-MCP23X17Pin AP_SELECTOR_PORTS[AP_SELECTOR_PORTS_NUM] = {
-    MCP23X17Pin(mcp, 0), MCP23X17Pin(mcp, 1), MCP23X17Pin(mcp, 2), MCP23X17Pin(mcp, 3), MCP23X17Pin(mcp, 5)};
+MCP23X17Pin AP_SELECTOR_PORTS[AP_SELECTOR_PORTS_NUM] = {MCP23X17Pin(mcp, 0), MCP23X17Pin(mcp, 1), MCP23X17Pin(mcp, 2),
+                                                        MCP23X17Pin(mcp, 3), MCP23X17Pin(mcp, 4)};
 
 const uint8_t ENC_1_CW_PORT = 4;
 const uint8_t ENC_1_CCW_PORT = 3;
@@ -37,10 +36,10 @@ const uint8_t DIGITS_CS_PIN = 8;
 const byte MCP2515_SPI_PORT = 10;
 const byte MCP2515_INT_PIN = 2;
 
+MCP23X17Pin s_ledPin(mcp, 5);
 MCP23X17Pin s_errorLedPin(mcp, 8);
 MCP23X17Pin s_buttonPin(mcp, 7);
 MCP23X17Pin s_actionButtonPin(mcp, 6);
-
 
 class SelectorTask : private Task
 {
@@ -49,9 +48,9 @@ public:
 
     void setSelectorCallback(fastdelegate::FastDelegate1<int8_t> callback) { apSelectorCallback_ = callback; }
 
-    int8_t selectorValue()
+    uint8_t selectorValue()
     {
-        for (int i = 0; i < AP_SELECTOR_PORTS_NUM; ++i)
+        for (uint8_t i = 0; i < AP_SELECTOR_PORTS_NUM; ++i)
         {
             if (apSelector_[i].isPressed())
             {
@@ -63,7 +62,7 @@ public:
 
     void start()
     {
-        for (int i = 0; i < AP_SELECTOR_PORTS_NUM; ++i)
+        for (uint8_t i = 0; i < AP_SELECTOR_PORTS_NUM; ++i)
         {
             apSelector_[i].interval(20);
             apSelector_[i].setPressedState(LOW);
@@ -76,7 +75,7 @@ private:
     {
         if (apSelectorCallback_)
         {
-            for (int i = 0; i < AP_SELECTOR_PORTS_NUM; ++i)
+            for (uint8_t i = 0; i < AP_SELECTOR_PORTS_NUM; ++i)
             {
                 apSelector_[i].update();
                 if (apSelector_[i].pressed())
@@ -95,9 +94,9 @@ private:
 
 private:
     Bounce2::Button3 apSelector_[AP_SELECTOR_PORTS_NUM] = {
-        Bounce2::Button3(AP_SELECTOR_PORTS[0]), Bounce2::Button3(AP_SELECTOR_PORTS[0]),
-        Bounce2::Button3(AP_SELECTOR_PORTS[0]), Bounce2::Button3(AP_SELECTOR_PORTS[0]),
-        Bounce2::Button3(AP_SELECTOR_PORTS[0])};
+        Bounce2::Button3(AP_SELECTOR_PORTS[0]), Bounce2::Button3(AP_SELECTOR_PORTS[1]),
+        Bounce2::Button3(AP_SELECTOR_PORTS[2]), Bounce2::Button3(AP_SELECTOR_PORTS[3]),
+        Bounce2::Button3(AP_SELECTOR_PORTS[4])};
 
     fastdelegate::FastDelegate1<int8_t> apSelectorCallback_;
 };
@@ -171,7 +170,7 @@ public:
           taskEncoder3_(taskManager_, ENC_3_CW_PORT, ENC_3_CCW_PORT),
           taskEncoder4_(taskManager_, ENC_4_CW_PORT, ENC_4_CCW_PORT)
     {
-        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool,  Pin& >(this, &TPHandler::onXPDRButtonPressed));
+        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, Pin&>(this, &TPHandler::onXPDRButtonPressed));
         taskSelector_.setSelectorCallback(fastdelegate::FastDelegate1<int8_t>(this, &TPHandler::onSelectorSwitched));
         taskEncoder1_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder1));
         taskEncoder2_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder2));
@@ -181,20 +180,18 @@ public:
 
     virtual void setup() override
     {
-        // configure LED pins for output
-        mcp.pinMode(5, OUTPUT);
-        mcp.digitalWrite(5, HIGH);
-
-        // mcp.pinMode(8, OUTPUT);
-        // mcp.digitalWrite(8, LOW);
-
         CommonInstrument::setup();
 
+        // configure LED pins for output
+        s_ledPin.pinMode(OUTPUT);
+        s_ledPin.digitalWrite(LOW);
+
         taskDigits_.start();
-        taskDigits_.setOn();  // temp
 
         taskButton_.start();
         taskSelector_.start();
+
+        updateScreenOnOff();
 
         taskEncoder1_.start();
         taskEncoder2_.start();
@@ -203,10 +200,62 @@ public:
     }
 
 private:
-    void onReceive(int8_t motor, int16_t pos) {}
-    void onXPDRButtonPressed(bool pressed,  Pin&  btn) { Serial.println("AA"); }
-    void onSelectorSwitched(int8_t idx) { Serial.println(idx); }
+    virtual void onCANReceived(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len,
+                               byte* payload) override
+    {
+        if (port == 0)
+        {
+            sendStatus();
+            return;
+        }
 
+        if (port == 1 && len == sizeof(uint8_t))
+        {
+            uint8_t value = *(reinterpret_cast<int8_t*>(payload));
+            voltage_ = value;
+            updateScreenOnOff();
+            updateLedOnOff();
+        }
+
+        if (port == 2 && len == sizeof(uint8_t))
+        {
+            uint8_t value = *(reinterpret_cast<int8_t*>(payload));
+            led_ = value;
+            updateLedOnOff();
+        }
+    }
+
+    void onXPDRButtonPressed(bool pressed, Pin& btn)
+    {
+        if (pressed) return;  // send on release
+
+        uint8_t value = 0;
+        taskCAN_.sendMessage(0, 5, 0, sizeof(value), &value);
+    }
+
+    void onSelectorSwitched(int8_t idx)
+    {
+        uint8_t value = idx;
+        taskCAN_.sendMessage(0, 5, 0, sizeof(value), &value);
+
+        updateScreenOnOff();
+    }
+
+    bool voltageOk() { return voltage_ >= 10; }
+    void updateScreenOnOff()
+    {
+        uint8_t idx = taskSelector_.selectorValue();
+        Serial.println(idx);
+        if (idx == 1 || !voltageOk())
+            taskDigits_.setOff();
+        else
+            taskDigits_.setOn();
+    }
+
+    void updateLedOnOff()
+    {
+        s_ledPin.digitalWrite(HIGH * led_ * (voltageOk() ? 1 : 0));
+    }
     uint8_t increment(uint8_t digit, int8_t dir)
     {
         int8_t newDigit = (int8_t)digit + dir;
@@ -217,6 +266,20 @@ private:
     void onEncoder3(int8_t dir, long) { taskDigits_.setDigit(3, increment(taskDigits_.digit(3), dir)); }
     void onEncoder4(int8_t dir, long) { taskDigits_.setDigit(2, increment(taskDigits_.digit(2), dir)); }
 
+    void sendStatus()
+    {
+        // send selector mode
+        uint8_t value = taskSelector_.selectorValue();
+        taskCAN_.sendMessage(0, 0, 0, sizeof(value), &value);
+
+        // send gigits
+        for (uint8_t i = 0; i < 4; ++i)
+        {
+            uint8_t value = taskDigits_.digit(i);
+            taskCAN_.sendMessage(0, i + 1, 0, sizeof(value), &value);
+        }
+    }
+
 private:
     Digits taskDigits_;
     TaskButton taskButton_;
@@ -225,24 +288,27 @@ private:
     TaskEncoder taskEncoder2_;
     TaskEncoder taskEncoder3_;
     TaskEncoder taskEncoder4_;
+    uint8_t voltage_ = 0;
+    uint8_t led_ = 0;
 };
 
-TPHandler s_instrument;
+TPHandler* s_instrument = nullptr;
 
 void setup()
 {
     Serial.begin(9600);
 
     // init MCP first
-    if (!mcp.begin_I2C())
+    if (!mcp.begin())
     {
         Serial.println("I2C Error.");
     }
 
-    s_instrument.setup();
+    s_instrument = new TPHandler();
+    s_instrument->setup();
 }
 
 void loop()
 {
-    s_instrument.run();
+    s_instrument->run();
 }
