@@ -1,5 +1,5 @@
 
-#include "Bounce2MCP23017.h"
+#include "Bounce3.h"
 
 #include <Common.h>
 
@@ -12,8 +12,12 @@
 
 //  hardware speficics
 
+Adafruit_MCP23X17 mcp;
+
 const uint8_t AP_SELECTOR_PORTS_NUM = 5;
-const uint8_t AP_SELECTOR_PORTS[AP_SELECTOR_PORTS_NUM] = {0, 1, 2, 3, 4};
+MCP23X17Pin AP_SELECTOR_PORTS[AP_SELECTOR_PORTS_NUM] = {
+    MCP23X17Pin(mcp, 0), MCP23X17Pin(mcp, 1), MCP23X17Pin(mcp, 2), MCP23X17Pin(mcp, 3), MCP23X17Pin(mcp, 5)};
+
 const uint8_t ENC_1_CW_PORT = 4;
 const uint8_t ENC_1_CCW_PORT = 3;
 
@@ -33,7 +37,10 @@ const uint8_t DIGITS_CS_PIN = 8;
 const byte MCP2515_SPI_PORT = 10;
 const byte MCP2515_INT_PIN = 2;
 
-Adafruit_MCP23X17 mcp;
+MCP23X17Pin s_errorLedPin(mcp, 8);
+MCP23X17Pin s_buttonPin(mcp, 7);
+MCP23X17Pin s_actionButtonPin(mcp, 6);
+
 
 class SelectorTask : private Task
 {
@@ -58,7 +65,6 @@ public:
     {
         for (int i = 0; i < AP_SELECTOR_PORTS_NUM; ++i)
         {
-            apSelector_[i].attach(AP_SELECTOR_PORTS[i], INPUT_PULLUP);
             apSelector_[i].interval(20);
             apSelector_[i].setPressedState(LOW);
         }
@@ -88,9 +94,11 @@ private:
     }
 
 private:
-    Bounce2::ButtonMCP23017 apSelector_[AP_SELECTOR_PORTS_NUM] = {
-        Bounce2::ButtonMCP23017(mcp), Bounce2::ButtonMCP23017(mcp), Bounce2::ButtonMCP23017(mcp),
-        Bounce2::ButtonMCP23017(mcp), Bounce2::ButtonMCP23017(mcp)};
+    Bounce2::Button3 apSelector_[AP_SELECTOR_PORTS_NUM] = {
+        Bounce2::Button3(AP_SELECTOR_PORTS[0]), Bounce2::Button3(AP_SELECTOR_PORTS[0]),
+        Bounce2::Button3(AP_SELECTOR_PORTS[0]), Bounce2::Button3(AP_SELECTOR_PORTS[0]),
+        Bounce2::Button3(AP_SELECTOR_PORTS[0])};
+
     fastdelegate::FastDelegate1<int8_t> apSelectorCallback_;
 };
 
@@ -154,19 +162,16 @@ class TPHandler : public CommonInstrument
 {
 public:
     TPHandler()
-        : CommonInstrument(MCP2515_SPI_PORT, MCP2515_INT_PIN),
+        : CommonInstrument(s_errorLedPin, s_buttonPin, MCP2515_SPI_PORT, MCP2515_INT_PIN),
           taskDigits_(&taskManager_),
-          taskButton_(taskManager_, mcp, 6),
+          taskButton_(taskManager_, s_actionButtonPin),
           taskSelector_(taskManager_),
           taskEncoder1_(taskManager_, ENC_1_CW_PORT, ENC_1_CCW_PORT),
           taskEncoder2_(taskManager_, ENC_2_CW_PORT, ENC_2_CCW_PORT),
           taskEncoder3_(taskManager_, ENC_3_CW_PORT, ENC_3_CCW_PORT),
           taskEncoder4_(taskManager_, ENC_4_CW_PORT, ENC_4_CCW_PORT)
     {
-        setTaskErrorLed(new TaskErrorLedMCP23017(taskManager_, mcp, 8));
-        setTaskButton(new TaskButtonMCP23017(taskManager_, mcp, 7));
-
-        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, byte>(this, &TPHandler::onXPDRButtonPressed));
+        taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool,  Pin& >(this, &TPHandler::onXPDRButtonPressed));
         taskSelector_.setSelectorCallback(fastdelegate::FastDelegate1<int8_t>(this, &TPHandler::onSelectorSwitched));
         taskEncoder1_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder1));
         taskEncoder2_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder2));
@@ -176,12 +181,6 @@ public:
 
     virtual void setup() override
     {
-        // init MCP first
-        if (!mcp.begin_I2C())
-        {
-            Serial.println("I2C Error.");
-        }
-
         // configure LED pins for output
         mcp.pinMode(5, OUTPUT);
         mcp.digitalWrite(5, HIGH);
@@ -205,7 +204,7 @@ public:
 
 private:
     void onReceive(int8_t motor, int16_t pos) {}
-    void onXPDRButtonPressed(bool pressed, byte btn) { Serial.println("AA"); }
+    void onXPDRButtonPressed(bool pressed,  Pin&  btn) { Serial.println("AA"); }
     void onSelectorSwitched(int8_t idx) { Serial.println(idx); }
 
     uint8_t increment(uint8_t digit, int8_t dir)
@@ -220,7 +219,7 @@ private:
 
 private:
     Digits taskDigits_;
-    TaskButtonMCP23017 taskButton_;
+    TaskButton taskButton_;
     SelectorTask taskSelector_;
     TaskEncoder taskEncoder1_;
     TaskEncoder taskEncoder2_;
@@ -233,6 +232,13 @@ TPHandler s_instrument;
 void setup()
 {
     Serial.begin(9600);
+
+    // init MCP first
+    if (!mcp.begin_I2C())
+    {
+        Serial.println("I2C Error.");
+    }
+
     s_instrument.setup();
 }
 
