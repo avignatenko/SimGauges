@@ -1,6 +1,7 @@
 
 #include <Common.h>
 
+#include <Pin.h>
 #include <BasicInstrument.h>
 #include <Interpolation.h>
 #include <TaskButton.h>
@@ -9,8 +10,8 @@
 #include <TaskStepperX27Driver.h>
 
 // hardware speficics
-const byte BUTTON_PORT = 7;
-const byte LED_PORT = 3;
+ArduinoPin BUTTON_PORT(7);
+ArduinoPin LED_PORT(3);
 const byte MCP2515_SPI_PORT = 10;
 const byte MCP2515_INT_PIN = 2;
 
@@ -21,7 +22,7 @@ const byte STEPPER_RESET = A2;
 class GenericSingleNeedleInstrument : public BasicInstrument
 {
 public:
-    GenericSingleNeedleInstrument(byte ledPin, byte buttonPin, byte canSPIPin, byte canIntPin)
+    GenericSingleNeedleInstrument(Pin& ledPin, Pin& buttonPin, byte canSPIPin, byte canIntPin)
         : BasicInstrument(ledPin, buttonPin, canSPIPin, canIntPin),
           taskStepper_(taskManager_, STEPPER_STEP, STEPPER_DIR, STEPPER_RESET)
     {
