@@ -3,12 +3,14 @@
 
 #include <Common.h>
 
-#include <BasicInstrument.h>
+#include <CommonInstrument.h>
 
 #include <LedControl_SW_SPI.h>
 #include <MCP23017.h>
+#include <MenuVars.h>
 #include <TaskButton.h>
 #include <TaskEncoder.h>
+#include <TaskMenu.h>
 
 //  hardware speficics
 MCP23017 mcp(0x20);
@@ -41,10 +43,10 @@ MCP23X17Pin s_errorLedPin(mcp, 8);
 MCP23X17Pin s_buttonPin(mcp, 7);
 MCP23X17Pin s_actionButtonPin(mcp, 6);
 
-class SelectorTask : private Task
+class TaskSelector : private Task
 {
 public:
-    SelectorTask(Scheduler& sh) : Task(20 * TASK_MILLISECOND, TASK_FOREVER, &sh, false) {}
+    TaskSelector(Scheduler& sh) : Task(20 * TASK_MILLISECOND, TASK_FOREVER, &sh, false) {}
 
     void setSelectorCallback(fastdelegate::FastDelegate1<int8_t> callback) { apSelectorCallback_ = callback; }
 
@@ -101,10 +103,10 @@ private:
     fastdelegate::FastDelegate1<int8_t> apSelectorCallback_;
 };
 
-class Digits : private Task
+class TaskDigits : private Task
 {
 public:
-    Digits(Scheduler* aScheduler = NULL) : Task(TASK_IMMEDIATE, TASK_ONCE, aScheduler, false) {}
+    TaskDigits(Scheduler* aScheduler = NULL) : Task(TASK_IMMEDIATE, TASK_ONCE, aScheduler, false) {}
     virtual bool Callback() override { return false; }
     void start()
     {
@@ -168,14 +170,27 @@ public:
           taskEncoder1_(taskManager_, ENC_1_CW_PORT, ENC_1_CCW_PORT),
           taskEncoder2_(taskManager_, ENC_2_CW_PORT, ENC_2_CCW_PORT),
           taskEncoder3_(taskManager_, ENC_3_CW_PORT, ENC_3_CCW_PORT),
-          taskEncoder4_(taskManager_, ENC_4_CW_PORT, ENC_4_CCW_PORT)
+          taskEncoder4_(taskManager_, ENC_4_CW_PORT, ENC_4_CCW_PORT),
+          taskMenu_(taskManager_),
+          vars_({"addr"}),
+          varsMenu_(vars_, taskMenu_.cmdLine())
+
     {
+        vars_.setVarCallback(etl::delegate<void(uint8_t, float)>::create<TPHandler, &TPHandler::onVarSet>(*this));
+        taskCAN_.setSimAddress(vars_.getVar(0));
+
         taskButton_.setPressedCallback(fastdelegate::FastDelegate2<bool, Pin&>(this, &TPHandler::onXPDRButtonPressed));
         taskSelector_.setSelectorCallback(fastdelegate::FastDelegate1<int8_t>(this, &TPHandler::onSelectorSwitched));
         taskEncoder1_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder1));
         taskEncoder2_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder2));
         taskEncoder3_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder3));
         taskEncoder4_.setRotationCallback(fastdelegate::FastDelegate2<int8_t, long>(this, &TPHandler::onEncoder4));
+    }
+
+    void onVarSet(uint8_t var, float value)
+    {
+        // there is only one var
+        taskCAN_.setSimAddress((uint16_t)value);
     }
 
     virtual void setup() override
@@ -197,9 +212,26 @@ public:
         taskEncoder2_.start();
         taskEncoder3_.start();
         taskEncoder4_.start();
+
+        taskMenu_.cmdLine().AddCommand(new SerialCommand("help", helpCallback));
+        taskMenu_.start();
     }
 
 private:
+    static void helpCallback(SerialCommands* cmd, void* param)
+    {
+        TPHandler* me = reinterpret_cast<TPHandler*>(param);
+        me->helpCallback(cmd);
+    }
+
+    void helpCallback(SerialCommands* cmd)
+    {
+        Stream* serial = cmd->GetSerial();
+        serial->println(F("Help: "));
+        serial->print(" ");
+        serial->println(varsMenu_.help());
+    }
+
     virtual void onCANReceived(byte priority, byte port, uint16_t srcAddress, uint16_t dstAddress, byte len,
                                byte* payload) override
     {
@@ -252,10 +284,7 @@ private:
             taskDigits_.setOn();
     }
 
-    void updateLedOnOff()
-    {
-        s_ledPin.digitalWrite(HIGH * led_ * (voltageOk() ? 1 : 0));
-    }
+    void updateLedOnOff() { s_ledPin.digitalWrite(HIGH * led_ * (voltageOk() ? 1 : 0)); }
     uint8_t increment(uint8_t digit, int8_t dir)
     {
         int8_t newDigit = (int8_t)digit + dir;
@@ -281,13 +310,17 @@ private:
     }
 
 private:
-    Digits taskDigits_;
+    TaskDigits taskDigits_;
     TaskButton taskButton_;
-    SelectorTask taskSelector_;
+    TaskSelector taskSelector_;
     TaskEncoder taskEncoder1_;
     TaskEncoder taskEncoder2_;
     TaskEncoder taskEncoder3_;
     TaskEncoder taskEncoder4_;
+    TaskMenu taskMenu_;
+    VarsStorage<1, 0> vars_;
+    VarsMenu varsMenu_;
+
     uint8_t voltage_ = 0;
     uint8_t led_ = 0;
 };
