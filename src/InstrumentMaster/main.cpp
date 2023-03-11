@@ -3,6 +3,7 @@
 
 #include <BasicInstrument.h>
 
+#include <Pin.h>
 #include <TaskButton.h>
 #include <TaskCAN.h>
 #include <TaskErrorLed.h>
@@ -12,8 +13,9 @@
 #include <map>
 
 // hardware speficics
-const int BUTTON_PORT = 7;
-const int LED_PORT = 4;
+ArduinoPin s_ledPin(4);
+ArduinoPin s_buttonPort(7);
+
 const int MCP2515_SPI_PORT = 10;
 const int MCP2515_INT_PIN = 2;
 
@@ -73,7 +75,7 @@ private:
 class InstrumentMaster : public CommonInstrument
 {
 public:
-    InstrumentMaster(byte ledPin, byte buttonPin, byte canSPIPin, byte canIntPin)
+    InstrumentMaster(Pin& ledPin, Pin& buttonPin, byte canSPIPin, byte canIntPin)
         : CommonInstrument(ledPin, buttonPin, canSPIPin, canIntPin),
           taskSimManager_(&taskErrorLed_, taskManager_),
           stats_(taskManager_, taskSimManager_)
@@ -109,7 +111,7 @@ public:
     }
 
 protected:
-    virtual void onButtonPressed(bool pressed, byte port)
+    virtual void onButtonPressed(bool pressed, Pin& port)
     {
         CommonInstrument::onButtonPressed(pressed, port);
         float payload = (pressed ? 60 : 0);
@@ -179,7 +181,7 @@ private:
     StatsTask stats_;
 };
 
-InstrumentMaster s_instrument(LED_PORT, BUTTON_PORT, MCP2515_SPI_PORT, MCP2515_INT_PIN);
+InstrumentMaster s_instrument(s_ledPin, s_buttonPort, MCP2515_SPI_PORT, MCP2515_INT_PIN);
 
 void setup()
 {
