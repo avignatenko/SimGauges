@@ -114,8 +114,8 @@ protected:
     virtual void onButtonPressed(bool pressed, Pin& port)
     {
         CommonInstrument::onButtonPressed(pressed, port);
-        float payload = (pressed ? 60 : 0);
-        taskCAN_.sendMessage(0, 0, 16, 4, (byte*)&payload);
+        byte payload = (pressed ? 1 : 0);
+        taskCAN_.sendMessage(0, 2, 31, 1, (byte*)&payload);
 
 #ifndef USE_SIMESSAGE
         Serial.println("DBG message sent");
@@ -167,11 +167,8 @@ private:
             return;
         }
 
-        static byte buffer[8];
-        memcpy(buffer, payload, len);
-
-        if (stats_.isEnabled()) stats_.addToStats(0, port, toSimAddress, len, buffer);
-        taskCAN_.sendMessage(0, port, toSimAddress, len, buffer);
+        if (stats_.isEnabled()) stats_.addToStats(0, port, toSimAddress, len, payload);
+        taskCAN_.sendMessage(0, port, toSimAddress, len, payload);
     }
 
 private:
