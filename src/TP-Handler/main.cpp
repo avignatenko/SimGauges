@@ -261,13 +261,12 @@ private:
     {
         if (pressed) return;  // send on release
 
-        uint8_t value = 0;
-        taskCAN_.sendMessage(0, 2, 0, sizeof(value), &value);
+        sendButton();
     }
 
     void onSelectorSwitched(int8_t idx)
     {
-        sendSquawk();
+        sendSelector();
         updateScreenOnOff();
     }
 
@@ -307,6 +306,12 @@ private:
     void onEncoder2(int8_t dir, long) { onEncoder(1, dir); }
     void onEncoder3(int8_t dir, long) { onEncoder(3, dir); }
     void onEncoder4(int8_t dir, long) { onEncoder(2, dir); }
+
+    void sendButton()
+    {
+        uint8_t value = 0;
+        taskCAN_.sendMessage(0, 2, 0, sizeof(value), &value);
+    }
 
     void sendSelector()
     {
