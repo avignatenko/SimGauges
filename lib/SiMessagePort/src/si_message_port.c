@@ -188,11 +188,13 @@ enum SiMessagePortResult si_message_port_init(enum SiMessagePortDevice device, e
 	case SI_MESSAGE_PORT_DEVICE_TEENSY_4_1:
 		lib.device = SIM_EXTERN_DEVICE_TYPE_TEENSY_4_1;
 		break;
-		
 	case SI_MESSAGE_PORT_DEVICE_HW_PORT:
 		lib.device = SIM_EXTERN_DEVICE_TYPE_HW_PORT;
 		break;
-
+	case SI_MESSAGE_PORT_DEVICE_RPI_PICO:
+		lib.device = SIM_EXTERN_DEVICE_TYPE_RPI_PICO;
+		break;
+		
 	default:
 		// Illegal device type
 		lib.device = SIM_EXTERN_DEVICE_TYPE_UNKNOWN;

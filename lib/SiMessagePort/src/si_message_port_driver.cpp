@@ -8,7 +8,7 @@ void si_message_port_driver_init() {
 
 void si_message_port_driver_sync(struct SiCircularData* input_buffer, struct SiCircularData* output_buffer) {
 	uint8_t byte;
-	if ( (Serial.availableForWrite() > 0) && (si_circular_poll(output_buffer, 0, &byte) == SI_OK) ) {
+	if (si_circular_poll(output_buffer, 0, &byte) == SI_OK) {
 		Serial.write(byte);
 	}
 
