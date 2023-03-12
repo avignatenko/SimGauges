@@ -262,14 +262,12 @@ private:
         if (pressed) return;  // send on release
 
         uint8_t value = 0;
-        taskCAN_.sendMessage(0, 5, 0, sizeof(value), &value);
+        taskCAN_.sendMessage(0, 2, 0, sizeof(value), &value);
     }
 
     void onSelectorSwitched(int8_t idx)
     {
-        uint8_t value = idx;
-        taskCAN_.sendMessage(0, 5, 0, sizeof(value), &value);
-
+        sendSquawk();
         updateScreenOnOff();
     }
 
@@ -277,7 +275,6 @@ private:
     void updateScreenOnOff()
     {
         uint8_t idx = taskSelector_.selectorValue();
-        Serial.println(idx);
         if (idx == 1 || !voltageOk())
             taskDigits_.setOff();
         else
@@ -290,23 +287,43 @@ private:
         int8_t newDigit = (int8_t)digit + dir;
         return ((uint8_t)newDigit) % 8;
     }
-    void onEncoder1(int8_t dir, long) { taskDigits_.setDigit(0, increment(taskDigits_.digit(0), dir)); }
-    void onEncoder2(int8_t dir, long) { taskDigits_.setDigit(1, increment(taskDigits_.digit(1), dir)); }
-    void onEncoder3(int8_t dir, long) { taskDigits_.setDigit(3, increment(taskDigits_.digit(3), dir)); }
-    void onEncoder4(int8_t dir, long) { taskDigits_.setDigit(2, increment(taskDigits_.digit(2), dir)); }
+
+    uint16_t makeTransponderNumber()
+    {
+        uint16_t res = taskDigits_.digit(3);
+        res += taskDigits_.digit(2) * 10;
+        res += taskDigits_.digit(1) * 100;
+        res += taskDigits_.digit(0) * 1000;
+        return res;
+    }
+
+    void onEncoder(uint8_t idx, int8_t dir)
+    {
+        taskDigits_.setDigit(idx, increment(taskDigits_.digit(idx), dir));
+        sendSquawk();
+    }
+
+    void onEncoder1(int8_t dir, long) { onEncoder(0, dir); }
+    void onEncoder2(int8_t dir, long) { onEncoder(1, dir); }
+    void onEncoder3(int8_t dir, long) { onEncoder(3, dir); }
+    void onEncoder4(int8_t dir, long) { onEncoder(2, dir); }
+
+    void sendSelector()
+    {
+        uint8_t value = taskSelector_.selectorValue();
+        taskCAN_.sendMessage(0, 0, 0, sizeof(value), &value);
+    }
+
+    void sendSquawk()
+    {
+        uint16_t newValue = makeTransponderNumber();
+        taskCAN_.sendMessage(0, 1, 0, sizeof(newValue), reinterpret_cast<byte*>(&newValue));
+    }
 
     void sendStatus()
     {
-        // send selector mode
-        uint8_t value = taskSelector_.selectorValue();
-        taskCAN_.sendMessage(0, 0, 0, sizeof(value), &value);
-
-        // send gigits
-        for (uint8_t i = 0; i < 4; ++i)
-        {
-            uint8_t value = taskDigits_.digit(i);
-            taskCAN_.sendMessage(0, i + 1, 0, sizeof(value), &value);
-        }
+        sendSelector();
+        sendSquawk();
     }
 
 private:
@@ -321,7 +338,7 @@ private:
     VarsStorage<1, 0> vars_;
     VarsMenu varsMenu_;
 
-    uint8_t voltage_ = 0;
+    uint8_t voltage_ = 12;
     uint8_t led_ = 0;
 };
 
