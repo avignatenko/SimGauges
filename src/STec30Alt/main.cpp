@@ -41,17 +41,10 @@ public:
         bigButton_.setPressedState(LOW);
 
         led1PortAlt_.pinMode(OUTPUT);
-        led1PortAlt_.digitalWrite(HIGH);
-
         led2PortOn_.pinMode(OUTPUT);
-        led2PortOn_.digitalWrite(HIGH);
-        
         led3PortDown_.pinMode(OUTPUT);
-        led3PortDown_.digitalWrite(LOW);
-        
         led4PortUp_.pinMode(OUTPUT);
-        led4PortUp_.digitalWrite(HIGH);
-        
+
         enable();
     }
 
@@ -69,24 +62,36 @@ private:
                                byte* payload) override
     {
         if (port >= 8 || len != 1) return;
+        uint8_t value = (*payload > 0 ? HIGH : LOW);
 
-        static int s_leds[] = {4, 5, 8, 9, A0, A1, A2};
-        byte value = *payload;
-
-        pinMode(s_leds[port], OUTPUT);
-        digitalWrite(s_leds[port], value > 0 ? 255 : 0);
+        switch (port)
+        {
+        case 0:
+            led1PortAlt_.digitalWrite(value);
+            break;
+        case 1:
+            led2PortOn_.digitalWrite(value);
+            break;
+        case 2:
+            led3PortDown_.digitalWrite(value);
+            break;
+        case 3:
+            led4PortUp_.digitalWrite(value);
+            break;
+        }
     }
 
     void onInstrumentButtonPressed(bool pressed, byte port)
     {
-        Serial.println("AA");
+        if (!pressed) return;
+
         uint8_t payload = (uint8_t)pressed;
         taskCAN_.sendMessage(0, port, 0, 1, &payload);
     }
 
 private:
     Bounce2::Button bigButton_;
-  
+
     ArduinoPin& led1PortAlt_;
     ArduinoPin& led2PortOn_;
     ArduinoPin& led3PortDown_;
