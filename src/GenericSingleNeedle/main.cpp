@@ -12,8 +12,8 @@
 // hardware speficics
 ArduinoPin BUTTON_PORT(7);
 ArduinoPin LED_PORT(3);
-const byte MCP2515_SPI_PORT = 10;
-const byte MCP2515_INT_PIN = 2;
+ArduinoPin MCP2515_SPI_PORT = 10;
+ArduinoPin MCP2515_INT_PIN = 2;
 
 const byte STEPPER_STEP = A0;
 const byte STEPPER_DIR = A1;
@@ -22,7 +22,7 @@ const byte STEPPER_RESET = A2;
 class GenericSingleNeedleInstrument : public BasicInstrument
 {
 public:
-    GenericSingleNeedleInstrument(Pin& ledPin, Pin& buttonPin, byte canSPIPin, byte canIntPin)
+    GenericSingleNeedleInstrument(Pin& ledPin, Pin& buttonPin,  Pin& canSPIPin,  Pin& canIntPin)
         : BasicInstrument(ledPin, buttonPin, canSPIPin, canIntPin),
           taskStepper_(taskManager_, STEPPER_STEP, STEPPER_DIR, STEPPER_RESET)
     {
